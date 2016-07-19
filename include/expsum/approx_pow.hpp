@@ -7,6 +7,7 @@
 #include <armadillo>
 
 #include "expsum/gamma.hpp"
+#include "expsum/exponential_sum.hpp"
 
 namespace expsum
 {
@@ -65,7 +66,7 @@ T newton_solve(T initial_guess, T tol, UnaryFunction1 transform,
 // @return pair of vectors holding expnents ``$a_{m}$`` and weights ``$w_{m}$``
 //
 template <typename T>
-std::tuple<arma::Col<T>, arma::Col<T>> approx_pow(T beta, T delta, T eps)
+exponential_sum<T, T> approx_pow(T beta, T delta, T eps)
 {
     using size_type   = arma::uword;
     using vector_type = arma::Col<T>;
