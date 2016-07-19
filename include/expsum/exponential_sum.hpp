@@ -1,5 +1,5 @@
-#ifndef EXPONENTIAL_SUM_H
-#define EXPONENTIAL_SUM_H
+#ifndef EXPSUM_EXPONENTIAL_SUM_HPP
+#define EXPSUM_EXPONENTIAL_SUM_HPP
 
 #include <iosfwd>
 #include <armadillo>
@@ -9,6 +9,7 @@ namespace expsum
 
 template <typename ResultT, typename ParamT = ResultT>
 class exponential_sum;
+
 //
 // Univariate function expressed as an exponential sum
 //
@@ -35,6 +36,9 @@ private:
     parameter_vector weight_;   // weights
 
 public:
+    constexpr static const bool is_real_function =
+        arma::is_real<result_type>::value;
+
     // Default constructor
     exponential_sum() = default;
 
@@ -157,6 +161,10 @@ public:
         weight_   = new_weights;
     }
     //
+    // Truncation
+    //
+    void trucate(argument_type tolerance);
+    //
     // Output to ostream
     //
     template <typename Ch, typename Tr>
@@ -181,6 +189,23 @@ private:
     }
 };
 
+template <typename ResultT, typename ParamT>
+void exponential_sum<ResultT, ParamT>::trucate(argument_type tolerance)
+{
+    // A * P + P * A.t() = B * B.t()
+    // A * (L * D * D * L.t()) + (L * D * D * L.t()) * A.t() = B * B.t()
+
+    // A * (S * S.t()) + (S * S.t()) * A.t() = B * B.t()
+    // A * (L * L.t()) + (L * L.t()) * A.t() = C * C.t()
+
+    // (L.t() * L) * A * (S * S.t()) * (L * L.t())
+    //  + (L.t() * L) *  (S * S.t()) * A.t() * (L * L.t())
+    //  = (L.t() * L) * B * B.t() * (L * L.t())
+
+    // B' = D * U.t() * L * B
+    // C' = C * S.t() * V * D
+}
+
 // Ostream operator
 template <typename Ch, typename Tr, typename ResultT, typename ParamT>
 std::basic_ostream<Ch, Tr>&
@@ -191,6 +216,37 @@ operator<<(std::basic_ostream<Ch, Tr>& os,
     return os;
 }
 
+
+//=============================================================================
+// Function multiplication
+//=============================================================================
+//
+// Multiply two exponential sum functions.
+//
+template <typename T1, typename P1, typename T2, typename P2>
+auto multiply(const exponential_sum<T1, P1>& x,
+              const exponential_sum<T2, P2>& y)
+    -> exponential_sum<decltype(T1() + T2()), decltype(P1() + P2())>
+{
+    using result_type =
+        exponential_sum<decltype(T1() + T2()), decltype(P1() + P2())>;
+    using size_type = typename result_type::size_type;
+
+    result_type z(x.size() * y.size());
+
+    size_type k = 0;
+    for (size_type j = 0; j < y.size(); ++j)
+    {
+        for (size_type i = 0; i < x.size(); ++i, ++k)
+        {
+            z.exponent(k) = x.exponent(i) + y.exponent(j);
+            z.weight(k)   = x.weight(i) * y.weight(j);
+        }
+    }
+
+    return z;
+}
+
 } // namespace: expsum
 
-#endif /* EXPONENTIAL_SUM_H */
+#endif /* EXPSUM_EXPONENTIAL_SUM_HPP */
