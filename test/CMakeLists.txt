@@ -5,6 +5,5 @@ endmacro()
 
 add_test_numeric(hankel_matrix)
 add_test_numeric(vandermonde_matrix)
-# add_test_numeric(fast_esprit)
-# add_test_numeric(gaussian_fit)
+add_test_numeric(cholesky_cauchy)
 
