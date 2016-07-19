@@ -16,7 +16,7 @@ endif()
 #===============================================================================
 
 # Project include directories, exectable output path, etc.
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/lib)
 
@@ -44,11 +44,11 @@ endif()
 # REQUIRED external packages
 #===============================================================================
 
-# External package directory
-set(EXTERNAL_PROJECT_DIR ${PROJECT_SOURCE_DIR}/external)
-add_subdirectory(external)
-include_directories(${EXTERNAL_PROJECT_DIR}/include)
-link_directories(${EXTERNAL_PROJECT_DIR}/lib)
+# # External package directory
+# set(EXTERNAL_PROJECT_DIR ${PROJECT_SOURCE_DIR}/external)
+# add_subdirectory(external)
+# include_directories(${EXTERNAL_PROJECT_DIR}/include)
+# link_directories(${EXTERNAL_PROJECT_DIR}/lib)
 
 # BLAS/LAPACK
 find_package(LAPACK)
