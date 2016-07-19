@@ -89,47 +89,14 @@ void test_fast_esprit(F fn, double xmin, double xmax, size_type N, size_type L,
     }
 }
 
-// void test_frequency_estimation(const numeric::ExponentialSum<Complex>& orig,
-//                                size_type N, size_type L, size_type M, double
-//                                eps)
-// {
-//     typedef arma::Col<Complex>          Vector;
-//     typedef numeric::FastESPRIT<Complex> ESPRIT;
-//     typedef numeric::ESPRITExpSum<Complex> ParamGenerator;
-//     typedef typename ESPRIT::Real        Real;
-
-//     Vector exact(N);
-//     make_sample([&](double x) { return orig.evalAt(x); },
-//                0.0, static_cast<double>(N), exact);
-//     auto delta = 1.0;
-
-//     // ESPRIT esprit(N, std::min<size_type>(100, n / 2));
-//     ESPRIT esprit(N, L, M);
-
-//     auto expsum = esprit.compute(exact, eps, ParamGenerator(0.0, delta));
-
-//     std::cout << "# exponents and weights (original)\n";
-
-//     for (size_type i = 0; i < orig.size(); ++i)
-//     {
-//         std::cout << orig.exponents(i) << '\t'
-//                   << orig.weights(i) << '\n';
-//     }
-
-//     std::cout << "# exponents and weights (found)\n";
-//     for (size_type i = 0; i < expsum.size(); ++i)
-//     {
-//         std::cout << expsum.exponents(i) << '\t'
-//                   << expsum.weights(i) << '\n';
-//     }
-// }
-
 int main()
 {
     std::cout.precision(15);
     std::cout.setf(std::ios::scientific);
 
-    std::cout << "# Bessel J0(x):  x in [0, 1000]" << std::endl;
+    std::cout << "# Approximation of Bessel J0(x): x in [0, 1000] by fast "
+                 "ESPRIT method."
+              << std::endl;
     size_type N = 1024;  // # of sampling points
     size_type L = N / 2; // window length
     size_type M = 100;   // max # of terms
@@ -138,7 +105,9 @@ int main()
     double eps  = 1.0e-10;
     test_fast_esprit(BesselJ0(), xmin, xmax, N, L, M, eps);
 
-    std::cout << "# 1/r: r in [1, 10^{6}]" << std::endl;
+    std::cout << "\n\n# Approximation of 1/r: r in [1, 10^{6}] by fast"
+                 "ESPRIT method."
+              << std::endl;
     N    = (1 << 12);
     L    = N / 2;
     M    = 100;

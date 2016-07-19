@@ -17,8 +17,8 @@ endif()
 
 # Project include directories, exectable output path, etc.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/lib)
+# set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+# set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/lib)
 
 # Additional module path
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
