@@ -6,36 +6,10 @@
 #include <armadillo>
 
 #include "expsum/lsqr.hpp"
+#include "expsum/numeric.hpp"
 
 namespace expsum
 {
-namespace detail
-{
-//
-// Fused multiply-add
-//
-// Computes `(x * y) + z` as if to infinite precision and rounded only once to
-// fit the result type.
-//
-template <typename T>
-inline T fma(T x, T y, T z)
-{
-    return std::fma(x, y, z);
-}
-
-template <typename T>
-inline std::complex<T> fma(const std::complex<T>& x, const std::complex<T>& y,
-                           const std::complex<T>& z)
-{
-    const auto re =
-        std::fma(-x.imag(), y.imag(), std::fma(x.real(), y.real(), z.real()));
-    const auto im =
-        std::fma(x.real(), y.imag(), std::fma(x.imag(), y.real(), z.imag()));
-    return {re, im};
-}
-
-} // namespace detail
-
 //
 // Generalized Vandermonde matrix
 //
@@ -189,7 +163,6 @@ public:
             auto s = value_type();
             for (size_type j = 0; j < nrows(); ++j)
             {
-                // s = detail::fma(s, zi, x(nrows() - j - 1));
                 s = s * zi + x(nrows() - j - 1);
             }
 

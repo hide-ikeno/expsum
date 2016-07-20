@@ -1,4 +1,4 @@
-#ifndef EXPFIT_NUMERIC_HPP
+#bifndef EXPFIT_NUMERIC_HPP
 #define EXPFIT_NUMERIC_HPP
 
 #include <complex>
@@ -24,7 +24,6 @@ std::complex<T> conj(const std::complex<T>& x)
     return std::conj(x);
 }
 
-
 //
 // Square of the absolute value
 //
@@ -42,8 +41,30 @@ T abs2(const std::complex<T>& x)
     return re * re + im * im;
 }
 
-} // namespace numeric
+//
+// Fused multiply-add
+//
+// Computes `(x * y) + z` as if to infinite precision and rounded only once to
+// fit the result type.
+//
+template <typename T>
+inline T fma(T x, T y, T z)
+{
+    return std::fma(x, y, z);
+}
 
-}  // namespace: expsum
+template <typename T>
+inline std::complex<T> fma(const std::complex<T>& x, const std::complex<T>& y,
+                           const std::complex<T>& z)
+{
+    const auto re =
+        std::fma(-x.imag(), y.imag(), std::fma(x.real(), y.real(), z.real()));
+    const auto im =
+        std::fma(x.real(), y.imag(), std::fma(x.imag(), y.real(), z.imag()));
+    return {re, im};
+}
+
+} // namespace numeric
+} // namespace: expsum
 
 #endif /* EXPFIT_NUMERIC_HPP */
