@@ -5,10 +5,8 @@
 
 namespace expsum
 {
-
 namespace numeric
 {
-
 //
 // Complex conjugate of a given scalar.
 //

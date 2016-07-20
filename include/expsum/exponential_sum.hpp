@@ -2,9 +2,10 @@
 #define EXPSUM_EXPONENTIAL_SUM_HPP
 
 #include <iosfwd>
+#include <stdexcept>
+
 #include <armadillo>
 
-#include "expsum/cholesky_cauchy.hpp"
 
 namespace expsum
 {
@@ -163,9 +164,22 @@ public:
         weight_   = new_weights;
     }
     //
+    // Remove terms with small weights
+    //
+    void remove_small_terms(argument_type tolerance)
+    {
+        const auto max_weight = arma::max(arma::abs(weight_));
+        const auto selected =
+            arma::find(arma::abs(weight_) > max_weight * tolerance);
+        parameter_vector tmp_e(exponent_(selected));
+        parameter_vector tmp_w(weight_(selected));
+        exponent_ = std::move(tmp_e);
+        weight_   = std::move(tmp_w);
+    }
+    //
     // Truncation
     //
-    void trucate(argument_type tolerance);
+    void truncate(argument_type tolerance);
     //
     // Output to ostream
     //
@@ -189,27 +203,90 @@ private:
     {
         return std::real(arma::sum(arma::exp(-x * exponent_) % weight_));
     }
+
+    // Sort by absolute value of exponent
+    void sort()
+    {
+        arma::uvec index = arma::linspace<arma::uvec>(0, size() - 1, size());
+        std::sort(std::begin(index), std::end(index),
+                  [this](size_type i, size_type j) {
+                      return std::abs(exponent(i)) < std::abs(exponent(j));
+                  });
+        parameter_vector tmp(exponent_(index));
+        exponent_ = tmp;
+        tmp       = weight_(index);
+        weight_   = std::move(tmp);
+    }
 };
 
+
 template <typename ResultT, typename ParamT>
-void exponential_sum<ResultT, ParamT>::trucate(argument_type tolerance)
+void exponential_sum<ResultT, ParamT>::truncate(argument_type tolerance)
 {
-    weight_ = arma::sqrt(weight_);
-    const auto n = weight_.size();
-    cholesky_cauchy_rrd<parameter_type> chol(n);
-    auto matL = chol.run(exponent_, weight_, tolerance);
-    // A * P + P * A.t() = B * B.t()
-    // A * (L * D * D * L.t()) + (L * D * D * L.t()) * A.t() = B * B.t()
+    using matrix_type = arma::Mat<parameter_type>;
 
-    // A * (S * S.t()) + (S * S.t()) * A.t() = B * B.t()
-    // A * (L * L.t()) + (L * L.t()) * A.t() = C * C.t()
+    sort();
 
-    // (L.t() * L) * A * (S * S.t()) * (L * L.t())
-    //  + (L.t() * L) *  (S * S.t()) * A.t() * (L * L.t())
-    //  = (L.t() * L) * B * B.t() * (L * L.t())
+    size_type m0 = 0;
+    for (; m0 < size(); ++m0)
+    {
+        if (std::abs(exponent(m0)) >= argument_type(1))
+        {
+            break;
+        }
+    }
+    parameter_vector h(2 * m0);
 
-    // B' = D * U.t() * L * B
-    // C' = C * S.t() * V * D
+    const auto w_small = weight_.head(m0);   // View
+    const auto a_small = exponent_.head(m0); // View
+    const auto w_large = weight_.tail(size() - m0);   // View
+    const auto a_large = exponent_.tail(size() - m0); // View
+
+    h(0) = arma::sum(w_small);
+    h(1) = -arma::sum(w_small % a_small);
+
+    size_type m    = 1;
+    auto factorial = argument_type(1);
+    for (; m < m0; ++m)
+    {
+        h(2 * m)     = arma::sum(w_small % arma::pow(a_small, 2 * m));
+        h(2 * m + 1) = -arma::sum(w_small % arma::pow(a_small, 2 * m + 1));
+        factorial *= argument_type((2 * m) * (2 * m + 1));
+        if (std::abs(h(2 * m + 1)) / factorial < tolerance)
+        {
+            // Taylor expansion converges with the tolerance eps.
+            ++m;
+            break;
+        }
+    }
+
+    matrix_type H(m, m + 1);
+    for (size_type k = 0; k <= m; ++k)
+    {
+        H.col(k) = h.subvec(k, k + m - 1);
+    }
+
+    // fast_esprit<parameter_type> esprit(2 * m, m, m);
+
+    // esprit.fit(h.head(2 * m), argument_type(), argument_type(1), tolerance);
+
+    // m = esprit.exponents().n_elem;
+    // parameter_vector tmp_a(m + w_large.n_elem);
+    // parameter_vector tmp_w(m + w_large.n_elem);
+
+    // for (size_type i = 0; i < m; ++i)
+    // {
+    //     tmp_a(i) = std::real(esprit.exponents()(i));
+    // }
+    // tmp_a.tail(a_large.n_elem) = a_large;
+    // for (size_type i = 0; i < m; ++i)
+    // {
+    //     tmp_w(i) = std::real(esprit.weights()(i));
+    // }
+    // tmp_w.tail(w_large.n_elem) = w_large;
+
+    exponent_ = std::move(tmp_a);
+    weight_   = std::move(tmp_w);
 }
 
 // Ostream operator

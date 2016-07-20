@@ -63,7 +63,7 @@ public:
     {
         const size_type n = a.size();
         resize(n);
-        const size_type m = pivod_order(a, b, delta); // m <= n
+        const size_type m = pivot_order(a, b, delta); // m <= n
         matrix_type mat_L(n, m, arma::fill::zeros);
         cholesky_impl(a, b, mat_L);
 
@@ -106,29 +106,32 @@ public:
     //
     matrix_type reconstruct(const matrix_type& matL)
     {
-        assert(matL.n_rows == n_);
-        matrix_type ret(n_, n_);
-        auto sigma = work_.head(matL.n_cols);
-        sigma = matL.diag();
-        // *** Ugly const-cast hack ***
-        auto& lower = const_cast<matrix_type&>(matL);
-        lower.diag().ones();    // make unit lower
-        matrix_type X(arma::size(lower));
-        apply_row_permutation(lower, X);
-        // *** Restore diagonal part of matL
-        lower.diag() = sigma;
+        // assert(matL.n_rows == n_);
+        // matrix_type ret(n_, n_);
+        // auto sigma = work_.head(matL.n_cols);
+        // sigma = matL.diag();
+        // // *** Ugly const-cast hack ***
+        // auto& lower = const_cast<matrix_type&>(matL);
+        // lower.diag().ones();    // make unit lower
+        // matrix_type X(arma::size(lower));
+        // apply_row_permutation(lower, X);
+        // // *** Restore diagonal part of matL
+        // lower.diag() = sigma;
 
-        return matrix_type(X * arma::diagmat(arma::square(sigma)) * X.t());
+        // return matrix_type(X * arma::diagmat(arma::square(sigma)) * X.t());
+        matrix_type X(arma::size(matL));
+        apply_row_permutation(matL, X);
+        return matrix_type(X * X.t());
     }
 private:
-    size_type pivod_order(vector_type& a, vector_type& b, real_type delta);
+    size_type pivot_order(vector_type& a, vector_type& b, real_type delta);
     void cholesky_impl(const vector_type& a, const vector_type& b,
                        matrix_type& L);
 };
 
 template <typename T>
 typename cholesky_cauchy_rrd<T>::size_type
-cholesky_cauchy_rrd<T>::pivod_order(vector_type& a, vector_type& b,
+cholesky_cauchy_rrd<T>::pivot_order(vector_type& a, vector_type& b,
                                     real_type delta)
 {
     constexpr const real_type eps = std::numeric_limits<real_type>::epsilon();
@@ -189,6 +192,12 @@ cholesky_cauchy_rrd<T>::pivod_order(vector_type& a, vector_type& b,
             break;
         }
     }
+
+    if (m == n - 1)
+    {
+        ++m;
+    }
+
     //
     // Return truncation size
     //
@@ -233,20 +242,33 @@ void cholesky_cauchy_rrd<T>::cholesky_impl(const vector_type& a,
         }
     }
     //
-    // Scale strictly lower triangular part of G
-    //   - diagonal part of G contains D**2
-    //   - L = tril(G) * D^{-2} + I
+    // Scale matrix
     //
     for (size_type j = 0; j < rank; ++j)
     {
-        const auto djj = std::real(L(j, j));
-        L(j, j) = std::sqrt(djj);
+        const auto djj = std::sqrt(std::real(L(j, j)));
+        L(j, j) = djj;
 
         for (size_type i = j + 1; i < n; ++i)
         {
             L(i, j) /= djj;
         }
     }
+    // //
+    // // Scale strictly lower triangular part of G
+    // //   - diagonal part of G contains D**2
+    // //   - L = tril(G) * D^{-2} + I
+    // //
+    // for (size_type j = 0; j < rank; ++j)
+    // {
+    //     const auto djj = std::real(L(j, j));
+    //     L(j, j) = std::sqrt(djj);
+
+    //     for (size_type i = j + 1; i < n; ++i)
+    //     {
+    //         L(i, j) /= djj;
+    //     }
+    // }
 
     return;
 }

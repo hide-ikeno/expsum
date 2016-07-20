@@ -6,4 +6,5 @@ endmacro()
 add_test_numeric(hankel_matrix)
 add_test_numeric(vandermonde_matrix)
 add_test_numeric(cholesky_cauchy)
+add_test_numeric(jacobi_svd)
 

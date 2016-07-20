@@ -6,8 +6,8 @@
 
 #include <armadillo>
 
-#include "expsum/gamma.hpp"
 #include "expsum/exponential_sum.hpp"
+#include "expsum/gamma.hpp"
 
 namespace expsum
 {
@@ -69,7 +69,7 @@ template <typename T>
 exponential_sum<T, T> approx_pow(T beta, T delta, T eps)
 {
     using size_type   = arma::uword;
-    using vector_type = arma::Col<T>;
+    using result_type = exponential_sum<T, T>;
 
     assert(beta > T());
     assert(T() < delta && delta < T(1));
@@ -82,7 +82,7 @@ exponential_sum<T, T> approx_pow(T beta, T delta, T eps)
     // Parameters required for obtaining sub-optimal expansion
     //
     const T newton_tol = eps;
-    const T scale_l = T(1) / std::tgamma(beta);
+    const T scale_l    = T(1) / std::tgamma(beta);
     // Eq. (31) of [Beylkin2010]
     auto t_lower = detail::newton_solve(
         // Initial guess --- Eq. (33) of [Beylkin2010]
@@ -100,7 +100,7 @@ exponential_sum<T, T> approx_pow(T beta, T delta, T eps)
 
     // Eq. (32) of [Beylkin2010]
     const auto scale_u = scale_l / delta;
-    auto t_upper = detail::newton_solve(
+    auto t_upper       = detail::newton_solve(
         // Initial guess --- Eq. (34) of [Beylkin2010]
         std::log(-log_eps) - log_delta + log_beta + T(0.5),
         // Tolerance
@@ -122,15 +122,18 @@ exponential_sum<T, T> approx_pow(T beta, T delta, T eps)
     //
     const auto n0 = static_cast<size_type>(std::ceil((t_upper - t_lower) / h0));
 
-    vector_type tmp_a(n0), tmp_w(n0);
+    result_type ret(n0);
     const auto pre = h0 * scale_l; // h0 / tgamma(beta);
     for (size_type i = 0; i < n0; ++i)
     {
-        tmp_a(i) = std::exp(t_lower + h0 * i);
-        tmp_w(i) = pre * std::exp(beta * (t_lower + h0 * i));
+        ret.exponent(i) = std::exp(t_lower + h0 * i);
+        ret.weight(i)   = pre * std::exp(beta * (t_lower + h0 * i));
     }
 
-    return {tmp_a, tmp_w};
+    ret.truncate(eps);
+    // ret.remove_small_terms(eps / ret.size());
+
+    return ret;
 }
 
 } // namespace: expsum
