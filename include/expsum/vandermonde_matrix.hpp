@@ -184,7 +184,7 @@ public:
 
         for (size_type i = 0; i < ncols(); ++i)
         {
-            const auto zi = arma::access::alt_conj(coeffs_(i));
+            const auto zi = numeric::conj(coeffs_(i));
             // Evaluate polynomial using Honer's method
             auto s = value_type();
             for (size_type j = 0; j < nrows(); ++j)
@@ -232,7 +232,7 @@ void ldlt_vandermonde_gramian(const vandermonde_matrix<T>& V, MatrixT& mat,
     auto x2 = work.col(3);
 
     auto gramian = [&](size_type i, size_type j) {
-        const auto arg = arma::access::alt_conj(z(i)) * z(j);
+        const auto arg = numeric::conj(z(i)) * z(j);
         return arg == one ? value_type(m)
                           : (one - std::pow(arg, m)) / (one - arg);
     };
@@ -261,12 +261,12 @@ void ldlt_vandermonde_gramian(const vandermonde_matrix<T>& V, MatrixT& mat,
 
         auto mu1 = x1(k);
         auto mu2 = x2(k);
-        auto nu1 = arma::access::alt_conj(y1(k));
-        auto nu2 = arma::access::alt_conj(y2(k));
+        auto nu1 = numeric::conj(y1(k));
+        auto nu2 = numeric::conj(y2(k));
 
         auto zk     = z(k);
         auto zk_inv = one / zk;
-        auto denom  = arma::access::alt_conj(zk_inv) - zk;
+        auto denom  = numeric::conj(zk_inv) - zk;
 
         if (abs(denom) < tiny)
         {
@@ -287,9 +287,9 @@ void ldlt_vandermonde_gramian(const vandermonde_matrix<T>& V, MatrixT& mat,
 
         for (size_type i = k + 1; i < n; ++i)
         {
-            const auto d1 = (arma::access::alt_conj(mu1) * y1(i) +
-                             arma::access::alt_conj(mu2) * y2(i));
-            const auto d2 = sigma2 * (zk_inv - arma::access::alt_conj(z(i)));
+            const auto d1 =
+                (numeric::conj(mu1) * y1(i) + numeric::conj(mu2) * y2(i));
+            const auto d2 = sigma2 * (zk_inv - numeric::conj(z(i)));
             bk(i)         = d1 / d2;
         }
 
@@ -297,8 +297,8 @@ void ldlt_vandermonde_gramian(const vandermonde_matrix<T>& V, MatrixT& mat,
 
         x1.tail(nt) -= mu1 * bk.tail(nt);
         x2.tail(nt) -= mu2 * bk.tail(nt);
-        y1.tail(nt) -= arma::access::alt_conj(nu1) * bk.tail(nt);
-        y2.tail(nt) -= arma::access::alt_conj(nu2) * bk.tail(nt);
+        y1.tail(nt) -= numeric::conj(nu1) * bk.tail(nt);
+        y2.tail(nt) -= numeric::conj(nu2) * bk.tail(nt);
     }
 
     // arma::Mat<T> tmp_V(V.as_dense_matrix());

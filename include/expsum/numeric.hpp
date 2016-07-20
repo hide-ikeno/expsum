@@ -8,6 +8,23 @@ namespace expsum
 
 namespace numeric
 {
+
+//
+// Complex conjugate of a given scalar.
+//
+template <typename T>
+T conj(T x)
+{
+    return x;
+}
+
+template <typename T>
+std::complex<T> conj(const std::complex<T>& x)
+{
+    return std::conj(x);
+}
+
+
 //
 // Square of the absolute value
 //

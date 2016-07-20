@@ -208,8 +208,8 @@ void cholesky_cauchy_rrd<T>::cholesky_impl(const vector_type& a,
     auto alpha = work_.head(n);
     alpha       = b;
 
-    const auto beta0 = arma::access::alt_conj(b(0));
-    const auto c_a0  = arma::access::alt_conj(a(0));
+    const auto beta0 = numeric::conj(b(0));
+    const auto c_a0  = numeric::conj(a(0));
     for (size_type l = 0; l < n; ++l)
     {
         L(l, 0) = alpha(l) * beta0 / (a(l) + c_a0);
@@ -219,14 +219,14 @@ void cholesky_cauchy_rrd<T>::cholesky_impl(const vector_type& a,
     {
         // Upgrade generators
         const auto akm1   = a(k - 1);
-        const auto c_akm1 = arma::access::alt_conj(akm1);
+        const auto c_akm1 = numeric::conj(akm1);
         for (size_type l = k; l < n; ++l)
         {
             alpha(l) *= (a(l) - akm1) / (a(l) + c_akm1);
         }
         // Extract k-th column for Cholesky factors
-        const auto beta_k = arma::access::alt_conj(alpha(k));
-        const auto c_ak   = arma::access::alt_conj(a(k));
+        const auto beta_k = numeric::conj(alpha(k));
+        const auto c_ak   = numeric::conj(a(k));
         for (size_type l = k; l < n; ++l)
         {
             L(l, k) = alpha(l) * beta_k / (a(l) + c_ak);

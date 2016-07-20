@@ -4,6 +4,8 @@
 #include <iosfwd>
 #include <armadillo>
 
+#include "expsum/cholesky_cauchy.hpp"
+
 namespace expsum
 {
 
@@ -192,6 +194,10 @@ private:
 template <typename ResultT, typename ParamT>
 void exponential_sum<ResultT, ParamT>::trucate(argument_type tolerance)
 {
+    weight_ = arma::sqrt(weight_);
+    const auto n = weight_.size();
+    cholesky_cauchy_rrd<parameter_type> chol(n);
+    auto matL = chol.run(exponent_, weight_, tolerance);
     // A * P + P * A.t() = B * B.t()
     // A * (L * D * D * L.t()) + (L * D * D * L.t()) * A.t() = B * B.t()
 
@@ -215,7 +221,6 @@ operator<<(std::basic_ostream<Ch, Tr>& os,
     fn.print(os);
     return os;
 }
-
 
 //=============================================================================
 // Function multiplication
