@@ -1,4 +1,4 @@
-#bifndef EXPFIT_NUMERIC_HPP
+#ifndef EXPFIT_NUMERIC_HPP
 #define EXPFIT_NUMERIC_HPP
 
 #include <complex>
@@ -65,6 +65,6 @@ inline std::complex<T> fma(const std::complex<T>& x, const std::complex<T>& y,
 }
 
 } // namespace numeric
-} // namespace: expsum
+} // namespace expsum
 
 #endif /* EXPFIT_NUMERIC_HPP */
