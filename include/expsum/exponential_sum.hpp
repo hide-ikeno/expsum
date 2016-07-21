@@ -6,6 +6,9 @@
 
 #include <armadillo>
 
+#include "expsum/cholesky_cauchy.hpp"
+#include "expsum/qr_col_pivot.hpp"
+#include "expsum/jacobi_svd.hpp"
 
 namespace expsum
 {
@@ -224,69 +227,46 @@ template <typename ResultT, typename ParamT>
 void exponential_sum<ResultT, ParamT>::truncate(argument_type tolerance)
 {
     using matrix_type = arma::Mat<parameter_type>;
+    using real_vector_type = arma::Col<argument_type>;
 
-    sort();
+    // constexpr const auto eps = std::numeric_limits<argument_type>::epsilon();
 
-    size_type m0 = 0;
-    for (; m0 < size(); ++m0)
+    const size_type n0 = size();
+    parameter_vector vec_a(exponent_);
+    parameter_vector vec_b(arma::sqrt(weight_));
+    cholesky_cauchy_rrd<parameter_type> chol(n0);
+
+    std::cout << "*** Cholesky quasi-Cauchy" << std::endl;
+    matrix_type L(chol.run(vec_a, vec_b, tolerance));
+
+    real_vector_type sigma(L.n_cols);
+
+    std::cout << "*** Jacobi SVD" << std::endl;
+    jacobi_svd<parameter_type> svj;
+    svj.run(L, sigma, /* compute_U = */ true);
+
+    for (size_type i = 0; i < sigma.size(); ++i)
     {
-        if (std::abs(exponent(m0)) >= argument_type(1))
+        std::cout << sigma(i) << '\t' << sigma(i) * sigma(i) << '\n';
+    }
+
+    std::cout << std::endl;
+
+    auto n1 = sigma.size();
+    auto eig_sum = argument_type();
+    for (; n1 > 0; --n1)
+    {
+        const auto dk = sigma(n1 - 1);
+        eig_sum += dk * dk;
+        if (2 * eig_sum > tolerance)
         {
             break;
         }
     }
-    parameter_vector h(2 * m0);
 
-    const auto w_small = weight_.head(m0);   // View
-    const auto a_small = exponent_.head(m0); // View
-    const auto w_large = weight_.tail(size() - m0);   // View
-    const auto a_large = exponent_.tail(size() - m0); // View
+    std::cout << "*** after trucation: " << n1 << " terms" << std::endl;
 
-    h(0) = arma::sum(w_small);
-    h(1) = -arma::sum(w_small % a_small);
-
-    size_type m    = 1;
-    auto factorial = argument_type(1);
-    for (; m < m0; ++m)
-    {
-        h(2 * m)     = arma::sum(w_small % arma::pow(a_small, 2 * m));
-        h(2 * m + 1) = -arma::sum(w_small % arma::pow(a_small, 2 * m + 1));
-        factorial *= argument_type((2 * m) * (2 * m + 1));
-        if (std::abs(h(2 * m + 1)) / factorial < tolerance)
-        {
-            // Taylor expansion converges with the tolerance eps.
-            ++m;
-            break;
-        }
-    }
-
-    matrix_type H(m, m + 1);
-    for (size_type k = 0; k <= m; ++k)
-    {
-        H.col(k) = h.subvec(k, k + m - 1);
-    }
-
-    // fast_esprit<parameter_type> esprit(2 * m, m, m);
-
-    // esprit.fit(h.head(2 * m), argument_type(), argument_type(1), tolerance);
-
-    // m = esprit.exponents().n_elem;
-    // parameter_vector tmp_a(m + w_large.n_elem);
-    // parameter_vector tmp_w(m + w_large.n_elem);
-
-    // for (size_type i = 0; i < m; ++i)
-    // {
-    //     tmp_a(i) = std::real(esprit.exponents()(i));
-    // }
-    // tmp_a.tail(a_large.n_elem) = a_large;
-    // for (size_type i = 0; i < m; ++i)
-    // {
-    //     tmp_w(i) = std::real(esprit.weights()(i));
-    // }
-    // tmp_w.tail(w_large.n_elem) = w_large;
-
-    exponent_ = std::move(tmp_a);
-    weight_   = std::move(tmp_w);
+    return;
 }
 
 // Ostream operator

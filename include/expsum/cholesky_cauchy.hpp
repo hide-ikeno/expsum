@@ -1,15 +1,16 @@
 #ifndef EXPSUM_CHOLESKY_CAUCHY_HPP
 #define EXPSUM_CHOLESKY_CAUCHY_HPP
 
-#include <cassert>
 #include <armadillo>
+#include <cassert>
 
 #include "expsum/numeric.hpp"
 
 namespace expsum
 {
 //
-// Rank-revealing Cholesky decomposition for a quasi-Cauchy matrix.
+// Rank-revealing Cholesky decomposition for a positive-definite quasi-Cauchy
+// matrix.
 //
 // This class computes the Cholesky decomposition of ``$n \times n$``
 // quasi-Cauchy matrix defined as
@@ -123,6 +124,7 @@ public:
         apply_row_permutation(matL, X);
         return matrix_type(X * X.t());
     }
+
 private:
     size_type pivot_order(vector_type& a, vector_type& b, real_type delta);
     void cholesky_impl(const vector_type& a, const vector_type& b,
@@ -157,7 +159,6 @@ cholesky_cauchy_rrd<T>::pivot_order(vector_type& a, vector_type& b,
     {
         g(i) = numeric::abs2(b(i)) / (2 * std::real(a(i)));
     }
-
     //
     // Gaussian elimination with complete pivoting
     //
@@ -166,7 +167,21 @@ cholesky_cauchy_rrd<T>::pivot_order(vector_type& a, vector_type& b,
     size_type m = 0;
     for (; m < n - 1; ++m)
     {
-        const auto l = arma::abs(g.subvec(m, n - 1)).index_max() + m;
+        size_type l = m;
+        auto gmax   = std::abs(g(m));
+        //
+        // Find m <= l < n such that |g(l)| = max_{m<=k<n}|g(k)|
+        //
+        for (size_type k = m + 1; k < n; ++k)
+        {
+            auto gk = std::abs(g(k));
+            if (gk > gmax)
+            {
+                l    = k;
+                gmax = gk;
+            }
+        }
+
         if (l != m)
         {
             // Swap element
@@ -186,16 +201,12 @@ cholesky_cauchy_rrd<T>::pivot_order(vector_type& a, vector_type& b,
             g(k) *= numer / denom;
         }
 
-        if (std::abs(g(m)) < cutoff)
+        ++m;
+
+        if (std::abs(g(m - 1)) < cutoff)
         {
-            ++m;
             break;
         }
-    }
-
-    if (m == n - 1)
-    {
-        ++m;
     }
 
     //
@@ -215,7 +226,7 @@ void cholesky_cauchy_rrd<T>::cholesky_impl(const vector_type& a,
     assert(rank <= n);
 
     auto alpha = work_.head(n);
-    alpha       = b;
+    alpha      = b;
 
     const auto beta0 = numeric::conj(b(0));
     const auto c_a0  = numeric::conj(a(0));

@@ -4,5 +4,6 @@ macro(add_expsum_example target)
 endmacro()
 
 add_expsum_example(approx_pow)
+add_expsum_example(esprit)
 add_expsum_example(fast_esprit)
 
