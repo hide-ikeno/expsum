@@ -23,7 +23,7 @@ void test_jacobi_svd(size_type nrows, size_type ncols)
     matrix_type V(std::min(nrows, ncols), ncols);
     real_vector_type sigma(std::min(nrows, ncols));
 
-    expsum::one_sided_jacobi_svd(U, sigma, V, tol);
+    expsum::jacobi_svd(U, sigma, V, tol);
 
     auto err = arma::norm(A - U * arma::diagmat(sigma) * V.t(), 2);
     std::cout << "Error = " << err << std::endl;
@@ -47,11 +47,11 @@ int main()
     std::cout.setf(std::ios::scientific);
 
     std::cout << "*** 10x10 real matrix" << std::endl;
-    test_jacobi_svd<double>(10, 10);
+    test_jacobi_svd<double>(20, 20);
     std::cout << "*** 20x10 real matrix" << std::endl;
-    test_jacobi_svd<double>(20, 10);
+    test_jacobi_svd<double>(50, 30);
     std::cout << "*** 20x10 complex matrix" << std::endl;
-    test_jacobi_svd<std::complex<double>>(20, 10);
+    test_jacobi_svd<std::complex<double>>(50, 20);
 
     return 0;
 }

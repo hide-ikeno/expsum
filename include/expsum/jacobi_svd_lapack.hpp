@@ -1,6 +1,6 @@
 // -*- mode: c++; fill-column: 80; indent-tabs-mode: nil; -*-
-#ifndef EXPSUM_JACOBI_SVD_HPP
-#define EXPSUM_JACOBI_SVD_HPP
+#ifndef EXPSUM_JACOBI_SVD_LAPACK_HPP
+#define EXPSUM_JACOBI_SVD_LAPACK_HPP
 
 #include <cassert>
 
@@ -55,6 +55,7 @@ struct jacobi_svd
                 << " th argument had an illegal value";
             throw std::logic_error(msg.str());
         }
+
         if (info > arma::blas_int())
         {
             std::ostringstream msg;
@@ -116,9 +117,9 @@ struct jacobi_svd
     arma::Col<value_type> work;
 };
 
-//==============================================================================
+//-----------------------------------------------------------------------------
 // Specialization for complex matrix
-//==============================================================================
+//-----------------------------------------------------------------------------
 
 template <typename T>
 struct jacobi_svd<std::complex<T>>
@@ -137,12 +138,13 @@ struct jacobi_svd<std::complex<T>>
         char jobv = 'N';
         auto m    = static_cast<arma::blas_int>(A.n_rows);
         auto n    = static_cast<arma::blas_int>(A.n_cols);
+
         assert(m >= n);
         assert(sva.n_elem == A.n_cols);
-        // assert(sva.n_elem == A.n_cols);
+
         auto mv  = arma::blas_int();
         auto ldv = arma::blas_int(1);
-        value_type dummy_v[2];
+        value_type dummy_v[1];
         auto lwork  = static_cast<arma::blas_int>(cwork.size());
         auto lrwork = static_cast<arma::blas_int>(rwork.size());
 
@@ -212,12 +214,8 @@ struct jacobi_svd<std::complex<T>>
 
     void resize(size_type m, size_type n)
     {
-        auto length = std::max(size_type(6), m + n);
-        if (cwork.size() < length)
-        {
-            cwork.set_size(length);
-            rwork.set_size(length);
-        }
+        cwork.set_size(m + n);
+        rwork.set_size(std::max(size_type(6), n));
     }
 
     arma::Col<value_type> cwork;
@@ -226,4 +224,4 @@ struct jacobi_svd<std::complex<T>>
 
 } // namespace: expsum
 
-#endif /* EXPSUM_JACOBI_SVD_HPP */
+#endif /* EXPSUM_JACOBI_SVD_LAPACK_HPP */

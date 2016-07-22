@@ -80,8 +80,8 @@ int main()
     std::cout.setf(std::ios::scientific);
 
     arma::arma_rng::set_seed_random();
-
-    test_coneig_quasi_cauchy<double>(200);
+    // test_coneig_quasi_cauchy<double>(200);
+    test_coneig_quasi_cauchy<std::complex<double>>(20);
 
     return 0;
 }
