@@ -132,24 +132,24 @@ struct qr_col_pivot<std::complex<T> >
 
         auto m     = static_cast<arma::blas_int>(A.n_rows);
         auto n     = static_cast<arma::blas_int>(A.n_cols);
-        auto lwork = static_cast<arma::blas_int>(work.n_elem);
-        jpiv.zeros();
+        auto lwork = static_cast<arma::blas_int>(work_.n_elem);
+        jpiv_.zeros();
 
-        invoke(m, n, A.memptr(), m, jpiv.memptr(), tau.memptr(), work.memptr(),
-               lwork, rwork.memptr());
+        invoke(m, n, A.memptr(), m, jpiv_.memptr(), tau_.memptr(),
+               work_.memptr(), lwork, rwork_.memptr());
     }
 
     void resize(size_type m, size_type n)
     {
-        jpiv.set_size(n);
-        tau.set_size(std::min(m, n));
+        jpiv_.set_size(n);
+        tau_.set_size(std::min(m, n));
         const auto lwork = query(static_cast<arma::blas_int>(m),
                                  static_cast<arma::blas_int>(n));
-        if (work.size() < lwork)
+        if (work_.size() < lwork)
         {
-            work.set_size(lwork);
+            work_.set_size(lwork);
         }
-        rwork.set_size(2 * n);
+        rwork_.set_size(2 * n);
     }
     //
     // From output matrix of GEQP3, return matrix R * P.t()
@@ -158,13 +158,13 @@ struct qr_col_pivot<std::complex<T> >
     //
     arma::Mat<value_type> get_matrix_RPT(const arma::Mat<value_type>& A) const
     {
-        assert(A.n_cols == jpiv.size());
+        assert(A.n_cols == jpiv_.size());
         arma::Mat<value_type> RPT(std::min(A.n_rows, A.n_cols), A.n_cols,
                                   arma::fill::zeros);
-        arma::uvec ipiv(jpiv.size());
-        for (size_type i = 0; i < jpiv.size(); ++i)
+        arma::uvec ipiv(jpiv_.size());
+        for (size_type i = 0; i < jpiv_.size(); ++i)
         {
-            ipiv(static_cast<size_type>(jpiv(i) - 1)) = i;
+            ipiv(static_cast<size_type>(jpiv_(i) - 1)) = i;
         }
 
         for (size_type i = 0; i < ipiv.size(); ++i)
@@ -186,10 +186,10 @@ struct qr_col_pivot<std::complex<T> >
         auto m     = static_cast<arma::blas_int>(A.n_rows);
         auto n     = static_cast<arma::blas_int>(A.n_cols);
         auto k     = std::min(m, n);
-        auto lwork = static_cast<arma::blas_int>(work.n_elem);
+        auto lwork = static_cast<arma::blas_int>(work_.n_elem);
         arma::blas_int info;
-        arma::lapack::ungqr(&m, &n, &k, A.memptr(), &m, tau.memptr(),
-                            work.memptr(), &lwork, &info);
+        arma::lapack::ungqr(&m, &n, &k, A.memptr(), &m, tau_.memptr(),
+                            work_.memptr(), &lwork, &info);
 
         if (info < arma::blas_int())
         {
@@ -200,10 +200,10 @@ struct qr_col_pivot<std::complex<T> >
         }
     }
 private:
-    arma::Col<arma::blas_int> jpiv;
-    arma::Col<real_type> tau;
-    arma::Col<real_type> work;
-    arma::Col<real_type> rwork;
+    arma::Col<arma::blas_int> jpiv_;
+    arma::Col<value_type> tau_;
+    arma::Col<value_type> work_;
+    arma::Col<real_type> rwork_;
 
     // Get optimal workspace size
     static size_type query(arma::blas_int m, arma::blas_int n)
@@ -213,24 +213,24 @@ private:
         arma::blas_int jpiv[1];
         real_type rwork[2];
         arma::blas_int info;
-        arma::lapack::geqp3(&m, &n, &dummy[0], &jpiv[0], &dummy[0], &dummy[0],
-                            &lwork, &rwork[0], &info);
+        arma::lapack::geqp3(&m, &n, &dummy[0], &m, &jpiv[0], &dummy[0],
+                            &dummy[0], &lwork, &rwork[0], &info);
         return static_cast<size_type>(std::real(dummy[0]));
     }
 
     static arma::blas_int invoke(arma::blas_int m, arma::blas_int n,
-                                 value_type** A, arma::blas_int* jpiv,
-                                 value_type* tau, value_type* work,
-                                 arma::blas_int lwork, real_type* rwork)
+                                 value_type* A, arma::blas_int lda,
+                                 arma::blas_int* jpiv, value_type* tau,
+                                 value_type* work, arma::blas_int lwork,
+                                 real_type* rwork)
     {
         arma::blas_int info;
-        arma::lapack::geqp3(&m, &n, A, jpiv, tau, work, lwork, rwork, &info);
+        arma::lapack::geqp3(&m, &n, A, &lda, jpiv, tau, work, &lwork, rwork,
+                            &info);
         return info;
     }
 };
 
-
 } // namespace: expsum
-
 
 #endif /* EXPSUM_QR_COL_PIVOT_HPP */
