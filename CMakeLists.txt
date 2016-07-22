@@ -51,12 +51,47 @@ endif()
 # link_directories(${EXTERNAL_PROJECT_DIR}/lib)
 
 # BLAS/LAPACK
-find_package(LAPACK)
-if (LAPACK_FOUND)
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${LAPACK_LIKER_FLAGS}")
-else ()
-  message(FATAL_ERROR "Cannot find BLAS/LAPACK libraries. Project will not be built.")
+
+# BLAS / LAPACK
+set(BLAS_LAPACK_FOUND FALSE)
+set(EXPSUM_USE_MKL FALSE)
+if (NOT BLAS_LAPACK_FOUND)
+  set(MKL_SDL ON)
+  find_package(MKL QUIET)
+  if (MKL_FOUND)
+        set(BLAS_LAPACK_FOUND TRUE)
+        set(BLAS_LAPACK_LIBRARIES ${MKL_MINIMAL_LIBRARIES})
+        set(BLAS_LAPACK_INCLUDE_DIRS ${MKL_INCLUDE_DIRS})
+        set(CBLAS_INCLUDE_FILE   "mkl_cblas.h")
+        set(LAPACKE_INCLUDE_FILE "mkl_lapacke.h")
+
+        set(EXPSUM_USE_MKL TRUE)
+  endif()
 endif()
+
+if (NOT BLAS_LAPACK_FOUND)
+  find_package(OpenBLAS QUIET)
+  if (OpenBLAS_FOUND)
+        set(BLAS_LAPACK_FOUND TRUE)
+        set(BLAS_LAPACK_LIBRARIES ${OpenBLAS_LIBRARIES})
+        set(BLAS_LAPACK_INCLUDE_DIRS ${OpenBLAS_INCLUDE_DIRS})
+        set(CBLAS_INCLUDE_FILE "cblas.h")
+        set(LAPACKE_INCLUDE_FILE "lapacke.h")
+  endif()
+endif()
+
+if (BLAS_LAPACK_FOUND)
+  include_directories(${BLAS_LAPACK_INCLUDE_DIRS})
+else()
+  message(FATAL_ERROR "Cannot find BLAS/LAPACK/CBLAS/LAPACKE. project will not be built.")
+endif()
+
+# find_package(LAPACK)
+# if (LAPACK_FOUND)
+#   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${LAPACK_LIKER_FLAGS}")
+# else ()
+#   message(FATAL_ERROR "Cannot find BLAS/LAPACK libraries. Project will not be built.")
+# endif()
 
 # Armadillo -- a C++ linear algeblra library
 find_package(Armadillo)

@@ -284,9 +284,10 @@ inline void gesvj(char* joba, char* jobu, char* jobv, blas_int* m, blas_int* n,
                   std::complex<float>* cwork, blas_int* lwork, float* rwork,
                   blas_int* lrwork, blas_int* info)
 {
-    arma_fortran_noprefix(arma_cgesvj)(joba, jobu, jobv, m, n, a, lda, sva, mv,
-                                       v, ldv, cwork, lwork, rwork, lrwork,
-                                       info);
+    using complex_t = std::complex<float>;
+    arma_fortran_noprefix(arma_cgesvj)(
+        joba, jobu, jobv, m, n, (complex_t*)a, lda, sva, mv, (complex_t*)v, ldv,
+        (complex_t*)cwork, lwork, rwork, lrwork, info);
 }
 
 inline void gesvj(char* joba, char* jobu, char* jobv, blas_int* m, blas_int* n,
@@ -295,9 +296,10 @@ inline void gesvj(char* joba, char* jobu, char* jobv, blas_int* m, blas_int* n,
                   std::complex<double>* cwork, blas_int* lwork, double* rwork,
                   blas_int* lrwork, blas_int* info)
 {
-    arma_fortran_noprefix(arma_zgesvj)(joba, jobu, jobv, m, n, a, lda, sva, mv,
-                                       v, ldv, cwork, lwork, rwork, lrwork,
-                                       info);
+    using complex_t = std::complex<float>;
+    arma_fortran_noprefix(arma_zgesvj)(
+        joba, jobu, jobv, m, n, (complex_t*)a, lda, sva, mv, (complex_t*)v, ldv,
+        (complex_t*)cwork, lwork, rwork, lrwork, info);
 }
 
 } // namespace: lapack

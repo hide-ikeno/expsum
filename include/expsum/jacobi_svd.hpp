@@ -4,8 +4,8 @@
 
 #include <cassert>
 
-#include <stdexcept>
 #include <sstream>
+#include <stdexcept>
 
 #include <armadillo>
 #ifdef DEBUG
@@ -33,11 +33,11 @@ struct jacobi_svd
         char joba = 'G';
         char jobu = compute_U ? 'U' : 'N';
         char jobv = 'N';
-        auto m = static_cast<arma::blas_int>(A.n_rows);
-        auto n = static_cast<arma::blas_int>(A.n_cols);
+        auto m    = static_cast<arma::blas_int>(A.n_rows);
+        auto n    = static_cast<arma::blas_int>(A.n_cols);
         assert(m >= n);
         assert(sva.n_elem == A.n_cols);
-        auto mv = arma::blas_int();
+        auto mv  = arma::blas_int();
         auto ldv = arma::blas_int(2);
         value_type dummy_v[2];
         auto lwork = static_cast<arma::blas_int>(work.size());
@@ -72,13 +72,13 @@ struct jacobi_svd
         char joba = 'G';
         char jobu = compute_U ? 'U' : 'N';
         char jobv = 'V';
-        auto m = static_cast<arma::blas_int>(A.n_rows);
-        auto n = static_cast<arma::blas_int>(A.n_cols);
+        auto m    = static_cast<arma::blas_int>(A.n_rows);
+        auto n    = static_cast<arma::blas_int>(A.n_cols);
         assert(m >= n);
         assert(sva.n_elem == A.n_cols);
         assert(V.n_rows == A.n_cols && V.n_cols == A.n_cols);
 
-        auto mv = arma::blas_int();
+        auto mv    = arma::blas_int();
         auto lwork = static_cast<arma::blas_int>(work.size());
 
         arma::blas_int info;
@@ -121,7 +121,7 @@ struct jacobi_svd
 //==============================================================================
 
 template <typename T>
-struct jacobi_svd<std::complex<T> >
+struct jacobi_svd<std::complex<T>>
 {
     using value_type = std::complex<T>;
     using real_type  = T;
@@ -139,8 +139,9 @@ struct jacobi_svd<std::complex<T> >
         auto n    = static_cast<arma::blas_int>(A.n_cols);
         assert(m >= n);
         assert(sva.n_elem == A.n_cols);
+        // assert(sva.n_elem == A.n_cols);
         auto mv  = arma::blas_int();
-        auto ldv = arma::blas_int(2);
+        auto ldv = arma::blas_int(1);
         value_type dummy_v[2];
         auto lwork  = static_cast<arma::blas_int>(cwork.size());
         auto lrwork = static_cast<arma::blas_int>(rwork.size());

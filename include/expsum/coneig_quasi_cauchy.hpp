@@ -9,12 +9,13 @@
 #include <armadillo>
 
 #include "arma/lapack_extra.hpp"
-#include "expsum/numeric.hpp"
 #include "expsum/jacobi_svd.hpp"
+#include "expsum/numeric.hpp"
 #include "expsum/qr_col_pivot.hpp"
 
 namespace expsum
 {
+
 //
 // Computes accurate con-eigenvalue decomposition of matrix of the form
 // ``$X D^{2} X^{\ast}$``
@@ -53,31 +54,45 @@ void coneig_rrd(arma::Mat<T>& X,
 
     const auto n = X.n_rows;
     const auto m = X.n_cols;
-
-    matrix_type G(arma::diagmat(d) * (X.st() * X) * arma::diagmat(d));
+    std::cout << "***** dimention (" << n << ", " << m << ')' << std::endl;
+    //
+    // Form G = D * (X.st() * X) * D
+    //
+    matrix_type G(m, m);
+    G = X.st() * X;
+    for (size_type j = 0; j < m; ++j)
+    {
+        for (size_type i = 0; i < m; ++i)
+        {
+            G(i, j) *= d(i) * d(j);
+        }
+    }
     //
     // Compute G = Q * R * P.t() by Householder QR factorization with column
     // pivoting
     //
-    matrix_type G_orig(G);          // tentative copy
+    std::cout << "***** G = Q * R" << std::endl;
+    matrix_type Q(m, m), R(m, m);
+    arma::qr_econ(Q, R, G); // G = Q * R
 
-    qr_col_pivot<T> qr;
-    qr.run(G);
-    matrix_type RPT(qr.get_matrix_RPT(G));
+    // qr_col_pivot<T> qr;
+    // qr.run(G);
+    // matrix_type RPT(qr.get_matrix_RPT(G));
 
-    qr.make_matrix_Q(G);
-    std::cout << "|I-Q**H Q| = "
-              << arma::norm(arma::eye<matrix_type>(n, n) - G.t() * G, 2)
-              << '\n'
-              << "|G - QR| = " << arma::norm(G_orig - G * RPT, 2) << '\n';
+    // qr.make_matrix_Q(G);
+    // std::cout << "|I-Q**H Q| = "
+    //           << arma::norm(arma::eye<matrix_type>(n, n) - G.t() * G, 2)
+    //           << '\n'
+    //           << "|G - QR| = " << arma::norm(G_orig - G * RPT, 2) << '\n';
 
     //
     // Compute R1 = D^(-1) * (R * P.t()) * D^(-1)
     //
-    matrix_type R1(RPT);
+    std::cout << "***** R1 = D * R * D^(-1)" << std::endl;
+    matrix_type R1(R);
     for (size_type j = 0; j < m; ++j)
     {
-        for (size_type i = 0; i < m; ++i)
+        for (size_type i = 0; i <= j; ++i)
         {
             R1(i, j) /= d(i) * d(j);
         }
@@ -86,14 +101,14 @@ void coneig_rrd(arma::Mat<T>& X,
     // Compute SVD of R * P.t() = U * S * V.t(). We need singular values and
     // left singular vectors.
     //
-    jacobi_svd<T> svd;
+    std::cout << "***** R = U * S * V.t()" << std::endl;
     real_vector_type sigma(m);
-    svd.run(RPT, sigma, /*compute_U*/true);
-
+    jacobi_svd<T> svd;
+    svd.run(R, sigma, /*compute_U*/ true);
     //
     // Compute X1 = D^(-1) * U * S^{1/2}
     //
-    matrix_type X1(RPT);
+    matrix_type X1(R);
     for (size_type j = 0; j < m; ++j)
     {
         const auto sj = std::sqrt(sigma(j));
@@ -101,347 +116,202 @@ void coneig_rrd(arma::Mat<T>& X,
         {
             X1(i, j) *= sj / d(i);
         }
-        std::cout << arma::norm(X1.col(j), 2) << '\n';
+        // std::cout << arma::norm(X1.col(j), 2) << '\n';
     }
 
-    matrix_type Y1 = arma::solve(R1, X1);
+    std::cout << "***** solve R1 * Y1 = X1" << std::endl;
+    matrix_type Y1(m, m);
+    arma::solve(Y1, arma::trimatu(R1), X1);
 
-    matrix_type coneigvec(arma::conj(X) * arma::conj(Y1));
+    matrix_type coneigvec(n, m);
+    coneigvec = arma::conj(X) * arma::conj(Y1);
 
+    std::cout << "***** exit" << std::endl;
     X = coneigvec;
     d = sigma;
 }
 
 //
-// A = X D**2 X**H
-//
-// G = D X**T  X D = W S V**H
-//
-// Con-eigenvalues of A:  lambda(i) = S(i)
-// Con-eigenvectors of A: U = conj(X) * D * conj(V)
-//
-// Algorithm:
-// ----------
-//     G = U S V**H
-//     G**H G = V S**2 V**H
-//
-// let Z = X D V S**(-1/2), then
-//   conj(A) A Z = X D (D X**H conj(X) D) (D X**T X D) V S**(-1/2)
-//               = X D V S**2 V**H  V S**(-1/2)
-//               = X D V S**2 S**(-1/2)
-//               = Z S**2
-//
-//   G = Q R P**T = U S V**H
-//
-// - Compute matrix G = D X**T X D
-// - Compute QR factorization of G by column pivot Householder QR method:
-//     GP = QR
-// - compute SVD of RP**T = W S V**H
-//   or D.inv() R P**T D.inv() D V = D.inv() W S**(1/2)**2
-//
-// let
-//   R1 = D.inv() * R * D.inv()
-//   D2 = D * P**T * D.inv();
-//   X1 = D.inv() * W * S**(1/2)
-// then
-//   R1 * D2 * (D V S**(-1/2)) = X1
-//   D2 * (D V S**(-1/2)) = R1.inv() X1
-//   (D V S**(-1/2)) = D * P * D.inv() R1.inv() X1
-//
-// let
-//   R1 = D.inv() * R * P**T * D.inv()
-//      = (D.inv() * R * D.inv()) * (D * P**T * D.inv())
-//   X1 = D.inv() * W * S**(1/2)
-// then
-//   R1 * D V S**(-1/2) = X1
-//
-// i.e., D V S**(1/2) = R1.inv() X1
-//
 template <typename T>
-void coneigenvalueRRD(arma::Mat<T>&                                      X,
-                      arma::Col<typename arma::get_pod_type<T>::result>& d)
+class cholesky_quasi_cauchy
 {
-    using UIndex     = arma::uword;
-    using Real       = typename arma::get_pod_type<T>::result;
-    using Matrix     = arma::Mat<T>;
-    using RealVector = arma::Col<Real>;
+public:
+    using value_type = T;
+    using real_type  = typename arma::get_pod_type<T>::result;
+    using size_type  = arma::uword;
 
-    static const auto jacobi_tolerance = arma::Datum<Real>::eps;
-    const auto n = X.n_cols;
+    using vector_type      = arma::Col<value_type>;
+    using matrix_type      = arma::Mat<value_type>;
+    using real_vector_type = arma::Col<real_type>;
 
-    Matrix G(n, n);
-    Matrix QR(n, n);
-    Matrix R(n, n);
-    Matrix RP(n, n);
-    Matrix U(n, n);
-    Matrix X1(n, n);
-    Matrix Y1(n, n);
-    Matrix Y2(n, n);
+private:
+    size_type n_;
+    arma::uvec ipiv_; // pivot order of rows
+    vector_type work1_;
+    vector_type work2_;
 
-    G = arma::diagmat(d) * (X.st() * X) * arma::diagmat(d);
-    //
-    // Compute SVD of matrix G in two-step:
-    //
-    // 1. Compute Housefolder QR with column pivotting:
-    //    GP = QR (P is a permutation matrix)
-    //
-    QR = G;
-    auto N     = static_cast<arma::blas_int>(n);
-    auto lwork = static_cast<arma::blas_int>((n + 1) * n);
-    arma::Col<T> work(static_cast<UIndex>(lwork));
-    arma::blas_int info = 0;
-    arma::Col<arma::blas_int> jpiv(n, arma::fill::zeros);
-    arma::Col<T> tau(n);
-    arma::Col<Real> rwork(2 * n);
-    RealVector sigma(n);
-    arma::lapack::geqp3(&N, &N, QR.memptr(), &N, jpiv.memptr(), tau.memptr(),
-                        work.memptr(), &lwork, rwork.memptr(), &info);
-    // std::cout << QR.diag() << std::endl;
-    // check
-    RP.zeros();
-    for (UIndex j = 0; j < n; ++j)
+public:
+    // Default constructor
+    cholesky_quasi_cauchy() = default;
+    // Constructor with allocating workspace
+    explicit cholesky_quasi_cauchy(size_type n)
+        : n_(n), ipiv_(n), work1_(n), work2_(n)
     {
-        arma::blas_int idx = j + 1;
-        UIndex icol = 0;
-        while (icol < n)
+    }
+    // Default copy constructor
+    cholesky_quasi_cauchy(const cholesky_quasi_cauchy&) = default;
+    // Default move constructor
+    cholesky_quasi_cauchy(cholesky_quasi_cauchy&&) = default;
+    // Default destructor
+    ~cholesky_quasi_cauchy() = default;
+    // Copy assignment operator
+    cholesky_quasi_cauchy& operator=(const cholesky_quasi_cauchy&) = default;
+    // Move assignment operator
+    cholesky_quasi_cauchy& operator=(cholesky_quasi_cauchy&&) = default;
+    //
+    // Compute Cholesky decomposition.
+    //
+    // @a vector of length ``$n$`` defining quasi-Cauchy matrix
+    // @b vector of length ``$n$`` defining quasi-Cauchy matrix
+    // @x vector of length ``$n$`` defining quasi-Cauchy matrix
+    // @y vector of length ``$n$`` defining quasi-Cauchy matrix
+    // @delta target size
+    // @X matrix of dimention ``$n \times m$``, where ``$m$`` is the rank of
+    //    Cauchy matrix ``$C$`` and is internaly determined.
+    //    On exit, `X` holds Cholesky factor ``$X$`` which is a unit trianular
+    //    matrix.
+    // @d vector of length ``$m$``. On exit, `d` holds diagonal elements of
+    //    Cholesky factor ``$D$``.
+    //
+    void run(vector_type& a, vector_type& b, vector_type& x, vector_type& y,
+             real_type delta, matrix_type& X, real_vector_type& d)
+    {
+        const size_type n = a.size();
+        resize(n);
+        // Reorder vectors defining quasi-Cauchy matrix
+        const size_type m = pivot_order(a, b, x, y, delta, ipiv_, work1_);
+
+        // Compute Cholesky factor
+        X.set_size(n, m);
+        X.zeros();
+        d.set_size(m);
+        factorize(a, b, x, y, X, d, work1_, work2_);
+
+        return;
+    }
+    //
+    // Reserve memory for working space
+    //
+    void resize(size_type n)
+    {
+        n_ = n;
+        ipiv_.set_size(n);
+        work1_.set_size(n);
+        work2_.set_size(n);
+    }
+    //
+    // Apply permutation matrix generated by previous decomposition
+    //
+    template <typename Mat1, typename Mat2>
+    void apply_row_permutation(const Mat1& src, Mat2& dest) const
+    {
+        using size_type = arma::uword;
+
+        assert(src.n_rows == n_ && dest.n_rows == n_ &&
+               src.n_cols == dest.n_cols);
+
+        for (size_type j = 0; j < src.n_cols; ++j)
         {
-            if (jpiv(icol) == idx)
+            for (size_type i = 0; i < n_; ++i)
             {
-                break;
+                dest(ipiv_(i), j) = src(i, j);
             }
-            ++icol;
         }
-        RP.col(j).subvec(0, icol) = QR.col(icol).subvec(0, icol);
     }
-    // 2. Compute SVD of R P**T = W * S * V**H
-    //    R     <-- W
-    //    sigma <-- S.diag()
-    //    V is not necessary
-    // Upper triangular part of QR holds matrix R.
-    R = arma::trimatu(QR);
-    arma::lapack::ungqr(&N, &N, &N, QR.memptr(), &N, tau.memptr(),
-                        work.memptr(), &lwork, &info);
-    std::cout << "|I-Q**H Q| = "
-              << arma::norm(arma::eye<Matrix>(n, n) - QR.t() * QR, 2) << '\n'
-              << "|G - QR| = "
-              << arma::norm(G - QR * RP, 2) << '\n';
-
-    Matrix R1(RP);
-    for (UIndex j = 0; j < n; ++j)
+    //
+    // Reconstruct matrix from Cholesky factor
+    //
+    // @X Cholesky factor computed by `cholesky_quasi_cauchy::run`.
+    // @d Cholesky factor computed by `cholesky_quasi_cauchy::run`.
+    //
+    matrix_type reconstruct(const matrix_type& X, const real_vector_type& d)
     {
-        for (UIndex i = 0; i < n; ++i)
-        {
-            R1(i, j) /= d(i) * d(j);
-        }
+        matrix_type XD(X * arma::diagmat(d));
+        matrix_type PXD(arma::size(XD));
+        apply_row_permutation(XD, PXD);
+
+        return matrix_type(PXD * PXD.t());
     }
-    // std::cout << R1.diag() << std::endl;
-    // U = R;
-    U = RP;
-    oneSidedJacobiSVD(U, sigma, jacobi_tolerance);
-    // std::cout << sigma << std::endl;
-    // Matrix& U = R;              // Right singular vector of G
-    // R1 = D.inv() * R * D.inv()
-    // X1 = D.inv() * U * sqrt(S)
-    for (UIndex j = 0; j < n; ++j)
-    {
-        const auto sj = std::sqrt(sigma(j));
-        for (UIndex i = 0; i < n; ++i)
-        {
-            U(i, j) *= sj / d(i);
-        }
-        std::cout << arma::norm(U.col(j), 2) << '\n';
-    }
-    // Y1 = R1.inv() * X1
-    // RealVector dinv(Real(1) / d);
-    // arma::solve(Y1, arma::trimatu(R1), U);
-    arma::solve(Y1, R1, U);
-    // Matrix Y1(arma::solve(R1, U));
-    // Matrix Y2(n, n);
-    // Y2 = D * P * D.inv() * Y1
-    // for (UIndex j = 0; j < n; ++j)
-    // {
-    //     // for (UIndex i = 0; i < n; ++i)
-    //     // {
-    //     //     UIndex irow = static_cast<UIndex>(jpiv(i) - 1);
-    //     //     Y2(irow, j) = d(j) * Y1(i, j) / d(i);
-    //     //     // Y2(irow, j) = d(irow) * Y1(i, j) / d(i);
-    //     // }
-    //     for (UIndex i = 0; i < n; ++i)
-    //     {
-    //         UIndex irow = static_cast<UIndex>(jpiv(i) - 1);
-    //         Y2(irow, j) = Y1(i, j);
-    //     }
-    //     std::cout << arma::norm(Y1.col(j), 2) << '\t'
-    //               << arma::norm(Y2.col(j), 2) << '\n';
-    // }
-    // Matrix Xtmp(X.n_rows, X.n_cols);
-    // Xtmp = X * Y2;
-    // X    = Xtmp;
-    // X *= Y2;
-    X *= Y1;
-    d.subvec(0, n - 1) = sigma;
-}
 
-// template <typename T>
-// void coneigenvalueRRD(arma::Mat<T>&                                      X,
-//                       arma::Col<typename arma::get_pod_type<T>::result>& d,
-//                       arma::Col<T>&                                      work,
-//                       arma::Col<typename arma::get_pod_type<T>::result>& rwork)
-// {
-//     using UIndex     = arma::uword;
-//     using Real       = typename arma::get_pod_type<T>::result;
-//     using Matrix     = arma::Mat<T>;
-//     using RealVector = arma::Col<Real>;
+private:
+    //
+    // Preconpute pivot order for the Cholesky factorization of $n \times n$
+    // positive-definite Caunchy matrix $C_{ij}=a_{i}b_{j}/(x_{i}+y_{j}).$
+    //
+    static size_type pivot_order(vector_type& a, vector_type& b, vector_type& x,
+                                 vector_type& y, real_type delta,
+                                 arma::uvec& ipiv, vector_type& g);
+    //
+    // Compute Cholesky factors (`X` and diagonal part of `D`).
+    //
+    // The arrays `a,b,x,y` must be properly reordered by calling `pivot_order`
+    // beforehand, so that the diagonal part of Cholesky factors appear in
+    // decesnding order.
+    //
+    // @a vector of length ``$n$`` defining quasi-Cauchy matrix (reordered)
+    // @b vector of length ``$n$`` defining quasi-Cauchy matrix (reordered)
+    // @x vector of length ``$n$`` defining quasi-Cauchy matrix (reordered)
+    // @y vector of length ``$n$`` defining quasi-Cauchy matrix (reordered)
+    // @X Cholesky factor (lower triangular matrix)
+    // @d diagonal elements of Cholesky factor ``$D$``
+    // @alpha working space
+    // @beta  working space
+    //
+    static void factorize(const vector_type& a, const vector_type& b,
+                          const vector_type& x, const vector_type& y,
+                          matrix_type& X, real_vector_type& d,
+                          vector_type& alpha, vector_type& beta);
 
-//     static const auto jacobi_tolerance = arma::Datum<Real>::eps;
+private:
+};
 
-//     // const UIndex m = X.n_rows;
-//     const UIndex n = X.n_cols;
-
-//     Matrix G(work.memptr(), n, n, /*copy_aux_mem*/ false, /*strict*/ true);
-//     G = arma::diagmat(d) * (X.st() * X) * arma::diagmat(d);
-
-//     // Matrix Q(work.memptr() +     n * n, n, n, false, true);
-//     // Matrix R(work.memptr() + 2 * n * n, n, n, false, true);
-//     //
-//     // Compute QR decomposition of G with pivotting
-//     //
-//     // G * P = Q * R
-//     //
-//     auto N     = static_cast<arma::blas_int>(n);
-//     auto lwork = static_cast<arma::blas_int>((n + 1) * n);
-//     arma::blas_int info = 0;
-//     arma::Col<arma::blas_int> jpiv(n, arma::fill::zeros);
-//     arma::Col<T> tau(n);
-//     arma::lapack::geqp3(&N, &N, G.memptr(), &N, jpiv.memptr(), tau.memptr(),
-//                         work.memptr() + n * n, &lwork, rwork.memptr(), &info);
-//     std::cout << "(gepq3 info): "  << info << std::endl;
-//     std::cout << "(gepq3 pivot): " << jpiv << std::endl;
-//     //
-//     // Uppre triangular part of G contains R
-//     //
-//     // Set U = R
-//     Matrix U(work.memptr() + n * n, n, n, false, true);
-//     // U.zeros();                 // initialized by 0
-//     // for (UIndex j = 0; j < n; ++j)
-//     // {
-//     //     auto jcol = static_cast<UIndex>(jpiv(j) - 1);
-//     //     for (UIndex i = 0; i <= jcol; ++i)
-//     //     {
-//     //         U(i, j) = G(i, jcol);
-//     //     }
-//     // }
-//     // G = U;
-//     U = arma::trimatu(G);
-//     //
-//     // Comput SVD of R (= U * S * V.t())
-//     //  - G is overwritten by matrix U.
-//     //  - V is not computed
-//     //
-//     // Matrix V(n, n);
-//     RealVector sigma(rwork.memptr(), n, false, true);
-//     // oneSidedJacobiSVD(U, sigma, V, jacobi_tolerance);
-//     oneSidedJacobiSVD(U, sigma, jacobi_tolerance);
-//     //
-//     // R1 = D.inv() * R * D.inv() -- overwrite G
-//     //
-//     Matrix RP(work.memptr() + 2 * n * n, n, n, false, true);
-//     RP.zeros();
-//     for (UIndex j = 0; j < n; ++j)
-//     {
-//         UIndex jcol = static_cast<UIndex>(jpiv(j) - 1);
-//         for (UIndex i = 0; i <= jcol; ++i)
-//         {
-//             RP(i, j) =  G(i, jcol) / (d(i) * d(j));
-//             // RP(i, j) =  G(i, jcol) / (d(i) * d(j));
-//         }
-//     }
-//     // auto R1 = arma::trimatu(G);
-//     //
-//     // Form X1 = D.inv() * U * sqrt(S).
-//     //  - Overwrite matrix R.
-//     //
-//     Matrix& X1 = U;
-//     for (UIndex j = 0; j < n; ++j)
-//     {
-//         const auto sj = std::sqrt(sigma(j));
-//         for (UIndex i = 0; i < n; ++i)
-//         {
-//             X1(i, j) *= sj / d(i);
-//         }
-//     }
-//     Matrix Y1(work.memptr() + 2 * n * n, n, n, false, true);
-//     //
-//     // Solve R1 * Y1 = X1
-//     //
-//     arma::solve(Y1, RP, X1);
-//     //
-//     // Set con-eigenvalues and con-eigenvectors
-//     //
-//     // d  = sigma;
-//     // X *= Y1;
-//     // X  = arma::conj(X);
-//     // for (UIndex i = 0; i < n; ++i)
-//     // {
-//     //     std::cout << arma::norm(X.col(i), 2) << '\n';
-//     // }
-//     X *= Y1;
-//     X  = arma::conj(X);
-//     // for (UIndex i = 0; i < n; ++i)
-//     // {
-//     //     auto nrm = arma::norm(X.col(i), 2);
-//     //     d(i) = sigma(i) * nrm;
-//     //     X.col(i) /= nrm;
-//     // }
-// }
-
-///
-/// Preconpute pivot order for the Cholesky factorization of \f$ n\times n \f$
-/// positive-definite Caunchy matrix \f$ C_{ij}=a_{i}b_{j}/(x_{i}+y_{j}). \f$
-///
+//------------------------------------------------------------------------------
+// Private member functions
+//------------------------------------------------------------------------------
 template <typename T>
-arma::uword
-cauchyPivotOrder(arma::Col<T>&                          a,
-                 arma::Col<T>&                          b,
-                 arma::Col<T>&                          x,
-                 arma::Col<T>&                          y,
-                 typename arma::get_pod_type<T>::result delta,
-                 arma::Col<arma::uword>&                ipiv,
-                 arma::Col<T>&                          work)
+typename cholesky_quasi_cauchy<T>::size_type
+cholesky_quasi_cauchy<T>::pivot_order(vector_type& a, vector_type& b,
+                                      vector_type& x, vector_type& y,
+                                      real_type delta, arma::uvec& ipiv,
+                                      vector_type& g)
 {
-    using UIndex = arma::uword;
-    using Real   = typename arma::get_pod_type<T>::result;
-
-    const UIndex n = a.size();
-
-    assert(b.size() == n && x.size() == n && y.size() == n);
-    assert(ipiv.size() == n && work.size() >= n);
-
+    const size_type n = a.size();
+    assert(b.size() == n);
+    assert(x.size() == n);
+    assert(y.size() == n);
+    assert(ipiv.size() == n);
+    assert(g.size() == n);
+    //
     // Set cutoff for GECP termination
-    const auto eta = arma::Datum<Real>::eps * delta * delta;
+    //
+    const auto eta = arma::Datum<real_type>::eps * delta * delta;
+    //
     // Form vector g(i) = a(i) * b(i) / (x(i) + y(i))
-    arma::Col<T> g(work.memptr(), n, /*copy_aux_mem*/ false, /*strict*/ true);
-    g    = (a % b) / (x + y);
+    //
+    g = (a % b) / (x + y);
+    //
     // Initialize permutation matrix
-    ipiv = arma::linspace<arma::Col<UIndex> >(0, n - 1, n);
+    //
+    ipiv = arma::linspace<arma::uvec>(0, n - 1, n);
 
-    UIndex m = 0;
+    size_type m = 0;
     while (m < n)
     {
-        UIndex l  = m;
-        auto gmax = std::abs(g(m));
         //
         // Find m <= l < n such that |g(l)| = max_{m<=k<n}|g(k)|
         //
-        for (UIndex k = m + 1; k < n; ++k)
-        {
-            auto gk = std::abs(g(k));
-            if (gk > gmax)
-            {
-                l    = k;
-                gmax = gk;
-            }
-        }
+        const auto l    = arma::abs(g.tail(n - m)).index_max() + m;
+        const auto gmax = std::abs(g(l));
 
         if (gmax < eta)
         {
@@ -451,11 +321,11 @@ cauchyPivotOrder(arma::Col<T>&                          a,
         if (l != m)
         {
             // Swap elements
-            std::swap(g(l),    g(m));
-            std::swap(a(l),    a(m));
-            std::swap(b(l),    b(m));
-            std::swap(x(l),    x(m));
-            std::swap(y(l),    y(m));
+            std::swap(g(l), g(m));
+            std::swap(a(l), a(m));
+            std::swap(b(l), b(m));
+            std::swap(x(l), x(m));
+            std::swap(y(l), y(m));
             // Swap _rows_ of permutation matrix
             std::swap(ipiv(l), ipiv(m));
         }
@@ -463,7 +333,7 @@ cauchyPivotOrder(arma::Col<T>&                          a,
         // Update diagonal of Schur complement
         const auto xm = x(m);
         const auto ym = y(m);
-        for (UIndex k = m + 1; k < n; ++k)
+        for (size_type k = m + 1; k < n; ++k)
         {
             g(k) *= (x(k) - xm) * (y(k) - ym) / ((x(k) + ym) * (y(k) + xm));
         }
@@ -475,53 +345,47 @@ cauchyPivotOrder(arma::Col<T>&                          a,
     return m;
 }
 
-///
-/// Partial Cholesky decomposition of positive-definite Cauchy matrix.
-///
 template <typename T>
-arma::uword choleskyCauchy(arma::Col<T>&                          a,
-                           arma::Col<T>&                          b,
-                           arma::Col<T>&                          x,
-                           arma::Col<T>&                          y,
-                           typename arma::get_pod_type<T>::result delta,
-                           arma::Mat<T>&                          G,
-                           arma::Col<arma::uword>&                ipiv,
-                           arma::Col<T>&                          alpha,
-                           arma::Col<T>&                          beta)
+void cholesky_quasi_cauchy<T>::factorize(const vector_type& a,
+                                         const vector_type& b,
+                                         const vector_type& x,
+                                         const vector_type& y, matrix_type& X,
+                                         real_vector_type& d,
+                                         vector_type& alpha, vector_type& beta)
 {
-    using UIndex = arma::uword;
-    using Real   = typename arma::get_pod_type<T>::result;
-
-    const auto n = a.size();
-    assert(b.size() == n && x.size() == n && y.size() == n && ipiv.size() == n);
-    assert(G.n_rows == n);
-
-    const auto rank = cauchyPivotOrder(a, b, x, y, delta, ipiv, alpha);
+    const auto n = X.n_rows;
+    const auto m = X.n_cols;
+    assert(a.size() == n);
+    assert(b.size() == n);
+    assert(x.size() == n);
+    assert(y.size() == n);
+    assert(d.size() == m);
+    assert(alpha.size() == n);
+    assert(beta.size() == n);
 
     alpha = a;
     beta  = b;
 
-    G.zeros();
-    // G.col(0) = (alpha % beta) / (x + y);
-    for (UIndex l = 0; l < n; ++l)
+    X.zeros();
+    for (size_type l = 0; l < n; ++l)
     {
-        G(l, 0) = alpha(l) * beta(0) / (x(l) + y(0));
+        X(l, 0) = alpha(l) * beta(0) / (x(l) + y(0));
     }
 
-    for (UIndex k = 1; k < rank; ++k)
+    for (size_type k = 1; k < m; ++k)
     {
         // Upgrade generators
         const auto xkm1 = x(k - 1);
         const auto ykm1 = y(k - 1);
-        for (UIndex l = k; l < n; ++l)
+        for (size_type l = k; l < n; ++l)
         {
             alpha(l) *= (x(l) - xkm1) / (x(l) + ykm1);
-            beta(l)  *= (y(l) - ykm1) / (y(l) + xkm1);
+            beta(l) *= (y(l) - ykm1) / (y(l) + xkm1);
         }
         // Extract k-th column for Cholesky factors
-        for (UIndex l = k; l < n; ++l)
+        for (size_type l = k; l < n; ++l)
         {
-            G(l, k) = alpha(l) * beta(k) / (x(l) + y(k));
+            X(l, k) = alpha(l) * beta(k) / (x(l) + y(k));
         }
     }
     //
@@ -529,17 +393,18 @@ arma::uword choleskyCauchy(arma::Col<T>&                          a,
     //   - diagonal part of G contains D**2
     //   - L = tril(G) * D^{-2} + I
     //
-    for (UIndex j = 0; j < rank; ++j)
+    for (size_type j = 0; j < m; ++j)
     {
-        auto djj = G(j, j);
-        G(j, j) = std::sqrt(djj);
-        for (UIndex i = j + 1; i < n; ++i)
+        auto djj = X(j, j);
+        d(j)     = std::sqrt(std::real(djj));
+        X(j, j) = real_type(1);
+        for (size_type i = j + 1; i < n; ++i)
         {
-            G(i, j) /= djj;
+            X(i, j) /= djj;
         }
     }
 
-    return rank;
+    return;
 }
 
 /*!
@@ -590,66 +455,36 @@ public:
     using real_matrix_type    = arma::Mat<real_type>;
     using complex_matrix_type = arma::Mat<complex_type>;
 
-private:
-    size_type rank_;
-    real_vector_type coneigvals_;
-    matrix_type coneigvecs_;
-    index_vector_type ipiv_;
-    vector_type work_;
-    real_vector_type rwork_;
-
 public:
     template <typename VecA, typename VecB, typename VecX, typename VecY>
-    typename std::enable_if<(arma::is_basevec<VecA>::value&&
-                             arma::is_basevec<VecA>::value&&
-                             arma::is_basevec<VecA>::value&&
-                             arma::is_basevec<VecA>::value), void>::type
-    compute(const VecA& a, const VecB& b,
-            const VecX& x, const VecY& y, real_type delta);
-
-    size_type rank() const
-    {
-        return rank_;
-    }
-
-    void resize(size_type n)
-    {
-        coneigvals_.set_size(n);
-        coneigvecs_.set_size(n, n);
-        ipiv_.set_size(n);
-        work_.set_size(std::max<size_type>(3 * n, 6) * n);
-        rwork_.set_size(2 * n);
-    }
-
-    const real_vector& coneigenvalues() const
-    {
-        return coneigvals_;
-    }
-
-    const Matrix& coneigenvectors() const
-    {
-        return coneigvecs_;
-    }
+    typename std::enable_if<
+        (arma::is_basevec<VecA>::value && arma::is_basevec<VecA>::value &&
+         arma::is_basevec<VecA>::value && arma::is_basevec<VecA>::value),
+        void>::type
+    compute(const VecA& a, const VecB& b, const VecX& x, const VecY& y,
+            real_type delta, real_vector_type& coneigvals,
+            matrix_type& coneigvecs);
 };
 
 template <typename T>
 template <typename VecA, typename VecB, typename VecX, typename VecY>
-typename std::enable_if<(arma::is_basevec<VecA>::value&&
-                         arma::is_basevec<VecA>::value&&
-                         arma::is_basevec<VecA>::value&&
-                         arma::is_basevec<VecA>::value), void>::type
-coneig_quasi_cauchy<T>::compute(const VecA& a, const VecB& b,
-                                 const VecX& x, const VecY& y, real_type delta)
+typename std::enable_if<
+    (arma::is_basevec<VecA>::value && arma::is_basevec<VecA>::value &&
+     arma::is_basevec<VecA>::value && arma::is_basevec<VecA>::value),
+    void>::type
+coneig_quasi_cauchy<T>::compute(const VecA& a, const VecB& b, const VecX& x,
+                                const VecY& y, real_type delta,
+                                real_vector_type& coneigvals,
+                                matrix_type& coneigvecs)
 {
     assert(a.n_elem == b.n_elem);
     assert(a.n_elem == x.n_elem);
     assert(a.n_elem == y.n_elem);
 
     const auto n = a.size();
-    resize(n);
 
 #ifdef DEBUG
-    Matrix C(n, n);
+    matrix_type C(n, n);
     for (size_type j = 0; j < n; ++j)
     {
         for (size_type i = 0; i < n; ++i)
@@ -659,109 +494,55 @@ coneig_quasi_cauchy<T>::compute(const VecA& a, const VecB& b,
     }
 #endif
 
-    value_type* p = work_.memptr();
-    {
-        Vector a_(p + 0 * n, n, /*copy_aux_mem*/ false, /*strict*/ true);
-        Vector b_(p + 1 * n, n, /*copy_aux_mem*/ false, /*strict*/ true);
-        Vector x_(p + 2 * n, n, /*copy_aux_mem*/ false, /*strict*/ true);
-        Vector y_(p + 3 * n, n, /*copy_aux_mem*/ false, /*strict*/ true);
-        Vector alpha(p + 5 * n, n, /*copy_aux_mem*/ false, /*strict*/ true);
-        Vector beta(p + 6 * n, n, /*copy_aux_mem*/ false, /*strict*/ true);
-        a_ = a;
-        b_ = b;
-        x_ = x;
-        y_ = y;
-        //
-        // Compute partial Cholesky factorization of quasi-Cauchy matrix with
-        // pivotting.
-        //
-        Matrix& X  = coneigvecs_;
-        rank_ = choleskyCauchy(a_, b_, x_, y_, delta, X, ipiv_, alpha, beta);
-        auto viewX = X.cols(0, rank_ - 1);
-        auto d     = coneigvals_.subvec(0, rank_ - 1);
-        //
-        // Copy diagonal elements of D.
-        //
-        // Note that, as the input matrix is positive-definite and Hermitian,
-        // D.diag() must have real, positive values.
-        //
-        d = arma::real(viewX.diag());
-        //
-        // L has unit diagonal.
-        //
-        viewX.diag().ones();
-        //
-        // Apply permutation matrix to form X = P * L
-        //
-        for (size_type j = 0; j < rank_; ++j)
-        {
-            // Vector a_ is used as an temporal space
-            for (size_type i = 0; i < n; ++i)
-            {
-                a_(ipiv_(i)) = X(i, j);
-            }
-            X.col(j) = a_;
-        }
+    vector_type a_(n);
+    vector_type b_(n);
+    vector_type x_(n);
+    vector_type y_(n);
+
+    a_ = a;
+    b_ = b;
+    x_ = x;
+    y_ = y;
+    //
+    // Compute partial Cholesky factorization of quasi-Cauchy matrix with
+    // pivotting.
+    //
+    matrix_type X;
+    real_vector_type d;
+    cholesky_quasi_cauchy<value_type> chol;
+    chol.run(a_, b_, x_, y_, delta, X, d);
+    matrix_type PX(arma::size(X));
+    chol.apply_row_permutation(X, PX);
 
 #ifdef DEBUG
-        Matrix W = viewX * arma::diagmat(arma::square(d)) * viewX.t();
-        std::cout << "(choleskyCauchy):\n"
-                     "  rank = "      << rank_
-                  << "  ||C - (PL) * D**2 * (PL).t()|| = "
+    {
+        matrix_type W = PX * arma::diagmat(arma::square(d)) * PX.t();
+        std::cout << "*** Cholesky factors of quasi-Cauchy matrix:\n"
+                     "  rank = "
+                  << PX.n_cols                             // rank
+                  << "  ||C - (PL) * D**2 * (PL).t()|| = " // residual
                   << arma::norm(C - W, 2) << std::endl;
-        for (size_type j = 0; j < rank_; ++j)
-        {
-            std::cout << d(j) << '\t' << arma::norm(viewX.col(j), 2) << '\n';
-        }
-#endif
+        // for (size_type j = 0; j < rank_; ++j)
+        // {
+        //     std::cout << d(j) << '\t' << arma::norm(viewX.col(j), 2) << '\n';
+        // }
     }
-
+#endif
     //
     // Compute con-eigenvalues and coresponding con-eigenvectors
     //
-    {
-        Matrix X(coneigvecs_.memptr(), n, rank_, false, true);
-        real_vector sigma(coneigvals_.memptr(), rank_, false, true);
-        std::cout << "coneigenvalueRRD" << std::endl;
-        // coneigenvalueRRD(X, sigma, work_, rwork_);
-        coneigenvalueRRD(X, sigma);
-        std::cout << "done" << std::endl;
-        //
-        // find largest index m such that coneigvals_(m) >= delta
-        //
-        size_type m = 0;
-        while (m < rank_)
-        {
-            if (coneigvals_(m) < delta)
-            {
-                break;
-            }
-            ++m;
-        }
-        rank_ = m;
+    std::cout << "*** coneig_rrd" << std::endl;
+    coneig_rrd(PX, d);
+    //
+    // find largest index m such that coneigvals_(m) >= delta
+    //
+    coneigvals.set_size(arma::size(d));
+    coneigvecs.set_size(arma::size(PX));
+    coneigvals = d;
+    coneigvecs = PX;
 
-#ifdef DEBUG
-        // auto viewX = X.cols(0, rank_ - 1);
-        // auto viewsigma = sigma.subvec(0, rank_ - 1);
-        // Matrix W = arma::conj(viewX) * arma::diagmat(viewsigma) * viewX.t();
-        // std::cout << "(coneigenvalueRRD):\n"
-        //         "  rank = "      << rank_
-        //           << "\n  ||C - conj(X) * D * (X).t()|| = "
-        //           << arma::norm(C - W, 2) << std::endl;
-        std::cout << "(coneigenvalueRRD):\n"
-                     "  rank = "      << rank_ << '\n';
-        std::cout << "# con-eigenvalue, norm(x(i)), err1, err2\n";
-        for (size_type k = 0; k < rank_; ++k)
-        {
-            auto uk   = X.col(k);
-            auto err1 = arma::norm(C * uk - sigma(k) * arma::conj(uk), 2);
-            auto err2 = arma::norm(C * arma::conj(uk) - sigma(k) * uk, 2);
-            std::cout << sigma(k) << '\t' << arma::norm(uk, 2) << '\t'
-                      << err1 << '\t' << err2 << '\n';
-        }
-#endif
-    }
 }
-}   // namespace: expsum
+
+} // namespace: expsum
 
 #endif /* EXPSUM_CONEIG_QUASI_CAUCHY_HPP */
