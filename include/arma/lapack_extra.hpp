@@ -28,6 +28,12 @@
 #define arma_cgesvj cgesvj
 #define arma_zgesvj zgesvj
 
+/* Another Jacobi SVD */
+#define arma_sgejsv sgejsv
+#define arma_dgejsv dgejsv
+#define arma_cgejsv cgejsv
+#define arma_zgejsv zgejsv
+
 #else
 
 #define arma_sbdsqr SBDSQR
@@ -50,6 +56,13 @@
 #define arma_dgesvj DGESVJ
 #define arma_cgesvj CGESVJ
 #define arma_zgesvj ZGESVJ
+
+/* Another Jacobi SVD */
+#define arma_sgejsv SGEJSV
+#define arma_dgejsv DGEJSV
+#define arma_cgejsv CGEJSV
+#define arma_zgejsv ZGEJSV
+
 #endif /* ARMA_BLAS_CAPITALS */
 
 namespace arma
@@ -150,16 +163,16 @@ void arma_fortran_noprefix(arma_sgesvj)(char* joba, char* jobu, char* jobv,
                                         blas_int* lwork, blas_int* info);
 void arma_fortran_noprefix(arma_dgesvj)(char* joba, char* jobu, char* jobv,
                                         blas_int* m, blas_int* n, double* a,
-                                        blas_int* lda, double* sva, blas_int* mv,
-                                        double* v, blas_int* ldv, double* work,
-                                        blas_int* lwork, blas_int* info);
+                                        blas_int* lda, double* sva,
+                                        blas_int* mv, double* v, blas_int* ldv,
+                                        double* work, blas_int* lwork,
+                                        blas_int* info);
 void arma_fortran_noprefix(arma_cgesvj)(char* joba, char* jobu, char* jobv,
                                         blas_int* m, blas_int* n, void* a,
-                                        blas_int* lda, float* sva,
-                                        blas_int* mv, void* v, blas_int* ldv,
-                                        void* cwork, blas_int* lwork,
-                                        float* rwork, blas_int* lrwork,
-                                        blas_int* info);
+                                        blas_int* lda, float* sva, blas_int* mv,
+                                        void* v, blas_int* ldv, void* cwork,
+                                        blas_int* lwork, float* rwork,
+                                        blas_int* lrwork, blas_int* info);
 void arma_fortran_noprefix(arma_zgesvj)(char* joba, char* jobu, char* jobv,
                                         blas_int* m, blas_int* n, void* a,
                                         blas_int* lda, double* sva,
@@ -167,6 +180,35 @@ void arma_fortran_noprefix(arma_zgesvj)(char* joba, char* jobu, char* jobv,
                                         void* cwork, blas_int* lwork,
                                         double* rwork, blas_int* lrwork,
                                         blas_int* info);
+
+// xGEJSV --- Jacobi SVD
+void arma_fortran_noprefix(arma_sgejsv)(char* joba, char* jobu, char* jobv,
+                                        char* jobr, char* jobt, char* jobp,
+                                        blas_int* m, blas_int* n, float* a,
+                                        blas_int* lda, float* sva, float* u,
+                                        blas_int* ldu, float* v, blas_int* ldv,
+                                        float* work, blas_int* lwork,
+                                        blas_int* iwork, blas_int* info);
+
+void arma_fortran_noprefix(arma_dgejsv)(char* joba, char* jobu, char* jobv,
+                                        char* jobr, char* jobt, char* jobp,
+                                        blas_int* m, blas_int* n, double* a,
+                                        blas_int* lda, double* sva, double* u,
+                                        blas_int* ldu, double* v, blas_int* ldv,
+                                        double* work, blas_int* lwork,
+                                        blas_int* iwork, blas_int* info);
+
+void arma_fortran_noprefix(arma_cgejsv)(
+    char* joba, char* jobu, char* jobv, char* jobr, char* jobt, char* jobp,
+    blas_int* m, blas_int* n, void* a, blas_int* lda, float* sva, void* u,
+    blas_int* ldu, void* v, blas_int* ldv, void* cwork, blas_int* lwork,
+    float* rwork, blas_int* lrwork, blas_int* iwork, blas_int* info);
+
+void arma_fortran_noprefix(arma_zgejsv)(
+    char* joba, char* jobu, char* jobv, char* jobr, char* jobt, char* jobp,
+    blas_int* m, blas_int* n, void* a, blas_int* lda, double* sva, void* u,
+    blas_int* ldu, void* v, blas_int* ldv, void* cwork, blas_int* lwork,
+    double* rwork, blas_int* lrwork, blas_int* iwork, blas_int* info);
 }
 
 namespace lapack
@@ -261,9 +303,8 @@ inline void geqp3(blas_int* m, blas_int* n, std::complex<double>* a,
 
 // Jacobi SVD
 inline void gesvj(char* joba, char* jobu, char* jobv, blas_int* m, blas_int* n,
-                  float* a, blas_int* lda, float* sva, blas_int* mv,
-                  float* v, blas_int* ldv, float* work, blas_int* lwork,
-                  blas_int* info)
+                  float* a, blas_int* lda, float* sva, blas_int* mv, float* v,
+                  blas_int* ldv, float* work, blas_int* lwork, blas_int* info)
 {
     arma_fortran_noprefix(arma_sgesvj)(joba, jobu, jobv, m, n, a, lda, sva, mv,
                                        v, ldv, work, lwork, info);
@@ -300,6 +341,51 @@ inline void gesvj(char* joba, char* jobu, char* jobv, blas_int* m, blas_int* n,
     arma_fortran_noprefix(arma_zgesvj)(
         joba, jobu, jobv, m, n, (complex_t*)a, lda, sva, mv, (complex_t*)v, ldv,
         (complex_t*)cwork, lwork, rwork, lrwork, info);
+}
+
+// Another Jacobi SVD
+inline void gejsv(char* joba, char* jobu, char* jobv, char* jobr, char* jobt,
+                  char* jobp, blas_int* m, blas_int* n, float* a, blas_int* lda,
+                  float* sva, float* u, blas_int* ldu, float* v, blas_int* ldv,
+                  float* work, blas_int* lwork, blas_int* iwork, blas_int* info)
+{
+    arma_fortran_noprefix(arma_sgejsv)(joba, jobu, jobv, jobr, jobt, jobp, m, n,
+                                       a, lda, sva, u, ldu, v, ldv, work, lwork,
+                                       iwork, info);
+}
+
+inline void gejsv(char* joba, char* jobu, char* jobv, char* jobr, char* jobt,
+                  char* jobp, blas_int* m, blas_int* n, double* a, blas_int* lda,
+                  double* sva, double* u, blas_int* ldu, double* v, blas_int* ldv,
+                  double* work, blas_int* lwork, blas_int* iwork, blas_int* info)
+{
+    arma_fortran_noprefix(arma_dgejsv)(joba, jobu, jobv, jobr, jobt, jobp, m, n,
+                                       a, lda, sva, u, ldu, v, ldv, work, lwork,
+                                       iwork, info);
+}
+
+inline void gejsv(char* joba, char* jobu, char* jobv, char* jobr, char* jobt,
+                  char* jobp, blas_int* m, blas_int* n, std::complex<float>* a,
+                  blas_int* lda, float* sva, std::complex<float>* u,
+                  blas_int* ldu, std::complex<float>* v, blas_int* ldv,
+                  std::complex<float>* cwork, blas_int* lwork, float* rwork,
+                  blas_int* lrwork, blas_int* iwork, blas_int* info)
+{
+    arma_fortran_noprefix(arma_cgejsv)(joba, jobu, jobv, jobr, jobt, jobp, m, n,
+                                       a, lda, sva, u, ldu, v, ldv, cwork,
+                                       lwork, rwork, lrwork, iwork, info);
+}
+
+inline void gejsv(char* joba, char* jobu, char* jobv, char* jobr, char* jobt,
+                  char* jobp, blas_int* m, blas_int* n, std::complex<double>* a,
+                  blas_int* lda, double* sva, std::complex<double>* u,
+                  blas_int* ldu, std::complex<double>* v, blas_int* ldv,
+                  std::complex<double>* cwork, blas_int* lwork, double* rwork,
+                  blas_int* lrwork, blas_int* iwork, blas_int* info)
+{
+    arma_fortran_noprefix(arma_zgejsv)(joba, jobu, jobv, jobr, jobt, jobp, m, n,
+                                       a, lda, sva, u, ldu, v, ldv, cwork,
+                                       lwork, rwork, lrwork, iwork, info);
 }
 
 } // namespace: lapack
