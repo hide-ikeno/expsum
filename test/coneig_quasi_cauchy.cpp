@@ -81,7 +81,7 @@ int main()
 
     arma::arma_rng::set_seed_random();
     // test_coneig_quasi_cauchy<double>(200);
-    test_coneig_quasi_cauchy<std::complex<double>>(20);
+    test_coneig_quasi_cauchy<std::complex<double>>(100);
 
     return 0;
 }

@@ -39,9 +39,17 @@ namespace expsum
 // @X rank-revealing factor ``$X$`` of size ``$n \times m$``
 // @d diagonal part of matrix ``$D$`` given as a vector of size ``$m$``
 //
+//
+//
+// X * D * (G.t() * G) * v = d^2 * X * D * v
+//
+// R = U * S * V.t()  or  R * V = U * S
+//   ==> V = R^(-1) * U * S
+//   ==> D * V * S^{-1/2} = D * R^(-1) * U * S^{1/2}
+//
 template <typename T>
 void coneig_rrd(arma::Mat<T>& X,
-                arma::Col<typename arma::get_pod_type<T>::result>& d)
+                 arma::Col<typename arma::get_pod_type<T>::result>& d)
 {
     using size_type = arma::uword;
     using real_type = typename arma::get_pod_type<T>::result;
@@ -54,7 +62,6 @@ void coneig_rrd(arma::Mat<T>& X,
 
     const auto n = X.n_rows;
     const auto m = X.n_cols;
-    std::cout << "***** dimention (" << n << ", " << m << ')' << std::endl;
     //
     // Form G = D * (X.st() * X) * D
     //
@@ -75,20 +82,14 @@ void coneig_rrd(arma::Mat<T>& X,
     matrix_type Q(m, m), R(m, m);
     arma::qr_econ(Q, R, G); // G = Q * R
 
-    // qr_col_pivot<T> qr;
-    // qr.run(G);
-    // matrix_type RPT(qr.get_matrix_RPT(G));
-
-    // qr.make_matrix_Q(G);
-    // std::cout << "|I-Q**H Q| = "
-    //           << arma::norm(arma::eye<matrix_type>(n, n) - G.t() * G, 2)
-    //           << '\n'
-    //           << "|G - QR| = " << arma::norm(G_orig - G * RPT, 2) << '\n';
+    std::cout << "|I-Q**H Q| = "
+              << arma::norm(arma::eye<matrix_type>(m, m) - Q.t() * Q, 2) << '\n'
+              << "|G - QR| = " << arma::norm(G - Q * R, 2) << '\n';
 
     //
     // Compute R1 = D^(-1) * (R * P.t()) * D^(-1)
     //
-    std::cout << "***** R1 = D * R * D^(-1)" << std::endl;
+    std::cout << "***** R1 = D^(-1) * R * D^(-1)" << std::endl;
     matrix_type R1(R);
     for (size_type j = 0; j < m; ++j)
     {
@@ -103,8 +104,14 @@ void coneig_rrd(arma::Mat<T>& X,
     //
     std::cout << "***** R = U * S * V.t()" << std::endl;
     real_vector_type sigma(m);
-    jacobi_svd<T> svd;
-    svd.run(R, sigma, /*compute_U*/ true);
+    // const auto ctol = arma::Datum<real_type>::eps * std::sqrt(real_type(m));
+    const auto ctol = arma::Datum<real_type>::eps;
+    matrix_type V(m, m);
+    matrix_type tmp(R);
+    jacobi_svd(R, sigma, V, ctol);
+    std::cout << "     |R - U * S * V.t()| = "
+              << arma::norm(tmp - R * arma::diagmat(sigma) * V.t(), 2)
+              << std::endl;
     //
     // Compute X1 = D^(-1) * U * S^{1/2}
     //
@@ -116,7 +123,6 @@ void coneig_rrd(arma::Mat<T>& X,
         {
             X1(i, j) *= sj / d(i);
         }
-        // std::cout << arma::norm(X1.col(j), 2) << '\n';
     }
 
     std::cout << "***** solve R1 * Y1 = X1" << std::endl;
@@ -124,9 +130,10 @@ void coneig_rrd(arma::Mat<T>& X,
     arma::solve(Y1, arma::trimatu(R1), X1);
 
     matrix_type coneigvec(n, m);
-    coneigvec = arma::conj(X) * arma::conj(Y1);
-
+    // coneigvec = arma::conj(X) * arma::conj(Y1);
+    coneigvec = X * Y1;
     std::cout << "***** exit" << std::endl;
+
     X = coneigvec;
     d = sigma;
 }
