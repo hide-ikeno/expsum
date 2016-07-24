@@ -60,13 +60,16 @@ public:
     // @b vector of length ``$n$`` defining quasi-Cauchy matrix
     // @delta target size
     //
-    matrix_type run(vector_type& a, vector_type& b, real_type delta)
+    void run(vector_type& a, vector_type& b, real_type delta, matrix_type& X,
+             real_vector_type& d)
     {
         const size_type n = a.size();
         resize(n);
         const size_type m = pivot_order(a, b, delta); // m <= n
-        matrix_type mat_L(n, m, arma::fill::zeros);
-        cholesky_impl(a, b, mat_L);
+        delta.set_size(m);
+        X.set_size(n, m);
+        X.zeros();
+        cholesky_impl(a, b, X, d);
 
         return mat_L;
     }
@@ -103,32 +106,23 @@ public:
     //
     // Reconstruct matrix from Cholesky factor
     //
-    // @matL Cholesky factor computed by `cholesky_cauchy_rrd::run`.
+    // @X Cholesky factor computed by `cholesky_quasi_cauchy::run`.
+    // @d Cholesky factor computed by `cholesky_quasi_cauchy::run`.
     //
-    matrix_type reconstruct(const matrix_type& matL)
+    matrix_type reconstruct(const matrix_type& X, const real_vector_type& d)
     {
-        // assert(matL.n_rows == n_);
-        // matrix_type ret(n_, n_);
-        // auto sigma = work_.head(matL.n_cols);
-        // sigma = matL.diag();
-        // // *** Ugly const-cast hack ***
-        // auto& lower = const_cast<matrix_type&>(matL);
-        // lower.diag().ones();    // make unit lower
-        // matrix_type X(arma::size(lower));
-        // apply_row_permutation(lower, X);
-        // // *** Restore diagonal part of matL
-        // lower.diag() = sigma;
+        matrix_type XD(X * arma::diagmat(d));
+        matrix_type PXD(arma::size(XD));
+        apply_row_permutation(XD, PXD);
 
-        // return matrix_type(X * arma::diagmat(arma::square(sigma)) * X.t());
-        matrix_type X(arma::size(matL));
-        apply_row_permutation(matL, X);
-        return matrix_type(X * X.t());
+        return matrix_type(PXD * PXD.t());
     }
+
 
 private:
     size_type pivot_order(vector_type& a, vector_type& b, real_type delta);
     void cholesky_impl(const vector_type& a, const vector_type& b,
-                       matrix_type& L);
+                       matrix_type& X, real_vector_type& d);
 };
 
 template <typename T>
@@ -217,11 +211,12 @@ cholesky_cauchy_rrd<T>::pivot_order(vector_type& a, vector_type& b,
 
 template <typename T>
 void cholesky_cauchy_rrd<T>::cholesky_impl(const vector_type& a,
-                                           const vector_type& b, matrix_type& L)
+                                           const vector_type& b, matrix_type& X,
+                                           real_vector_type& d)
 {
     const auto n = a.size();
     assert(b.size() == n);
-    assert(L.n_rows == n);
+    assert(X.n_rows == n);
     const auto rank = L.n_cols;
     assert(rank <= n);
 
@@ -232,7 +227,7 @@ void cholesky_cauchy_rrd<T>::cholesky_impl(const vector_type& a,
     const auto c_a0  = numeric::conj(a(0));
     for (size_type l = 0; l < n; ++l)
     {
-        L(l, 0) = alpha(l) * beta0 / (a(l) + c_a0);
+        X(l, 0) = alpha(l) * beta0 / (a(l) + c_a0);
     }
 
     for (size_type k = 1; k < rank; ++k)
@@ -249,7 +244,7 @@ void cholesky_cauchy_rrd<T>::cholesky_impl(const vector_type& a,
         const auto c_ak   = numeric::conj(a(k));
         for (size_type l = k; l < n; ++l)
         {
-            L(l, k) = alpha(l) * beta_k / (a(l) + c_ak);
+            X(l, k) = alpha(l) * beta_k / (a(l) + c_ak);
         }
     }
     //
@@ -258,11 +253,11 @@ void cholesky_cauchy_rrd<T>::cholesky_impl(const vector_type& a,
     for (size_type j = 0; j < rank; ++j)
     {
         const auto djj = std::sqrt(std::real(L(j, j)));
-        L(j, j) = djj;
-
+        d(j) = djj;
+        X(j, j) = real_type(1);
         for (size_type i = j + 1; i < n; ++i)
         {
-            L(i, j) /= djj;
+            X(i, j) /= djj;
         }
     }
     // //

@@ -85,6 +85,7 @@ void coneig_rrd(arma::Mat<T>& X,
     std::cout << "|I-Q**H Q| = "
               << arma::norm(arma::eye<matrix_type>(m, m) - Q.t() * Q, 2) << '\n'
               << "|G - QR| = " << arma::norm(G - Q * R, 2) << '\n';
+    std::cout << "***** diag(R)\n" << R.diag() << std::endl;
 
     //
     // Compute R1 = D^(-1) * (R * P.t()) * D^(-1)
@@ -130,8 +131,8 @@ void coneig_rrd(arma::Mat<T>& X,
     arma::solve(Y1, arma::trimatu(R1), X1);
 
     matrix_type coneigvec(n, m);
-    // coneigvec = arma::conj(X) * arma::conj(Y1);
-    coneigvec = X * Y1;
+    coneigvec = arma::conj(X) * arma::conj(Y1);
+    // coneigvec = X * Y1;
     std::cout << "***** exit" << std::endl;
 
     X = coneigvec;

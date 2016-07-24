@@ -255,8 +255,8 @@ void jacobi_svd(MatA& A, VecS& sigma, typename MatA::pod_type tol)
                 //
                 // where
                 //
-                //   a = \sum_{k=0}^{n-1} |A(k,i)|^{2} (computed in outer loop)
-                //   b = \sum_{k=0}^{n-1} |A(k,j)|^{2}
+                //   a = \sum_{k=0}^{n-1} |A(k,i)|^{2}
+                //   b = \sum_{k=0}^{n-1} |A(k,j)|^{2} (computed in outer loop)
                 //   c = \sum_{k=0}^{n-1} conj(A(k,i)) * A(k,j)
                 //
                 auto a    = jacobi_aux::submat_diag(A, i);

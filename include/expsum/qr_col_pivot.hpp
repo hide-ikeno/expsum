@@ -22,22 +22,22 @@ struct qr_col_pivot
 
         auto m     = static_cast<arma::blas_int>(A.n_rows);
         auto n     = static_cast<arma::blas_int>(A.n_cols);
-        auto lwork = static_cast<arma::blas_int>(work.n_elem);
-        jpiv.zeros();
+        auto lwork = static_cast<arma::blas_int>(work_.n_elem);
+        jpiv_.zeros();
 
-        invoke(m, n, A.memptr(), m, jpiv.memptr(), tau.memptr(), work.memptr(),
-               lwork);
+        invoke(m, n, A.memptr(), m, jpiv_.memptr(), tau_.memptr(),
+               work_.memptr(), lwork);
     }
 
     void resize(size_type m, size_type n)
     {
-        jpiv.set_size(n);
-        tau.set_size(std::min(m, n));
+        jpiv_.set_size(n);
+        tau_.set_size(std::min(m, n));
         const auto lwork = query(static_cast<arma::blas_int>(m),
                                  static_cast<arma::blas_int>(n));
-        if (work.size() < lwork)
+        if (work_.size() < lwork)
         {
-            work.set_size(lwork);
+            work_.set_size(lwork);
         }
     }
     //
@@ -47,13 +47,13 @@ struct qr_col_pivot
     //
     arma::Mat<value_type> get_matrix_RPT(const arma::Mat<value_type>& A) const
     {
-        assert(A.n_cols == jpiv.size());
+        assert(A.n_cols == jpiv_.size());
         arma::Mat<value_type> RPT(std::min(A.n_rows, A.n_cols), A.n_cols,
                                   arma::fill::zeros);
-        arma::uvec ipiv(jpiv.size());
-        for (size_type i = 0; i < jpiv.size(); ++i)
+        arma::uvec ipiv(jpiv_.size());
+        for (size_type i = 0; i < jpiv_.size(); ++i)
         {
-            ipiv(static_cast<size_type>(jpiv(i) - 1)) = i;
+            ipiv(static_cast<size_type>(jpiv_(i) - 1)) = i;
         }
 
         for (size_type i = 0; i < ipiv.size(); ++i)
@@ -75,10 +75,10 @@ struct qr_col_pivot
         auto m     = static_cast<arma::blas_int>(A.n_rows);
         auto n     = static_cast<arma::blas_int>(A.n_cols);
         auto k     = std::min(m, n);
-        auto lwork = static_cast<arma::blas_int>(work.n_elem);
+        auto lwork = static_cast<arma::blas_int>(work_.n_elem);
         arma::blas_int info;
-        arma::lapack::orgqr(&m, &n, &k, A.memptr(), &m, tau.memptr(),
-                            work.memptr(), &lwork, &info);
+        arma::lapack::orgqr(&m, &n, &k, A.memptr(), &m, tau_.memptr(),
+                            work_.memptr(), &lwork, &info);
 
         if (info < arma::blas_int())
         {
@@ -89,10 +89,30 @@ struct qr_col_pivot
         }
     }
 
+    arma::uvec pivot_order() const
+    {
+        arma::uvec ret(jpiv_.size());
+        for (size_type j = 0; j < jpiv_.size(); ++j)
+        {
+            ret(j) = static_cast<size_type>(jpiv_(j) - 1);
+        }
+    }
+
+    arma::uvec pivot_order_inv() const
+    {
+        arma::uvec ipiv(jpiv_.size());
+        for (size_type i = 0; i < jpiv_.size(); ++i)
+        {
+            ipiv(static_cast<size_type>(jpiv_(i) - 1)) = i;
+        }
+
+        return ipiv;
+    }
+
 private:
-    arma::Col<arma::blas_int> jpiv;
-    arma::Col<real_type> tau;
-    arma::Col<real_type> work;
+    arma::Col<arma::blas_int> jpiv_;
+    arma::Col<real_type> tau_;
+    arma::Col<real_type> work_;
 
     // Get optimal workspace size
     static size_type query(arma::blas_int m, arma::blas_int n)
@@ -199,6 +219,7 @@ struct qr_col_pivot<std::complex<T> >
             throw std::logic_error(msg.str());
         }
     }
+
 private:
     arma::Col<arma::blas_int> jpiv_;
     arma::Col<value_type> tau_;

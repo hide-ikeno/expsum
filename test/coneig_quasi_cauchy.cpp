@@ -13,13 +13,19 @@ using size_type = arma::uword;
 template <typename T>
 arma::Col<T> make_random_vector(size_type n)
 {
-    static const auto scale = 1 / std::sqrt(2);
-    arma::Col<T> ret(n, arma::fill::randu);
     if (arma::is_complex<T>::value)
     {
-        ret *= scale;
+        static const auto scale = 1 / std::sqrt(2);
+        arma::Col<T> ret(2 * n);
+        ret.head(n).randu();
+        ret.head(n) *= scale;
+        ret.tail(n) = arma::conj(ret.head(n));
+        return ret;
     }
-    return ret;
+    else
+    {
+        return arma::Col<T>(n, arma::fill::randu);
+    }
 }
 
 //
@@ -43,10 +49,10 @@ void test_coneig_quasi_cauchy(size_type n)
     vector_type x = T(1) / gamma;
     vector_type y = arma::conj(-gamma);
 
-    matrix_type C(n, n);
-    for (size_type j = 0; j < n; ++j)
+    matrix_type C(a.size(), a.size());
+    for (size_type j = 0; j < a.size(); ++j)
     {
-        for (size_type i = 0; i < n; ++i)
+        for (size_type i = 0; i < a.size(); ++i)
         {
             C(i, j) = a(i) * b(j) / (x(i) + y(j));
         }
@@ -60,7 +66,7 @@ void test_coneig_quasi_cauchy(size_type n)
     const auto n_coneigs = sigma.size();
     vector_type work(n);
 
-    std::cout << "# quasi-Cauchy matrix of dimension " << n << '\n'
+    std::cout << "# quasi-Cauchy matrix of dimension " << a.size() << '\n'
               << n_coneigs << " con-eigenpairs found\n"
               << "\n# lambda, |u|, |C * u - lambda * conj(u)|\n";
     for (size_type k = 0; k < n_coneigs; ++k)
@@ -80,8 +86,8 @@ int main()
     std::cout.setf(std::ios::scientific);
 
     arma::arma_rng::set_seed_random();
-    // test_coneig_quasi_cauchy<double>(200);
-    test_coneig_quasi_cauchy<std::complex<double>>(100);
+    test_coneig_quasi_cauchy<double>(100);
+    test_coneig_quasi_cauchy<std::complex<double>>(50);
 
     return 0;
 }
