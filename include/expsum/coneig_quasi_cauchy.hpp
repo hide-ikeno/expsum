@@ -12,6 +12,7 @@
 #include "expsum/jacobi_svd.hpp"
 #include "expsum/numeric.hpp"
 #include "expsum/qr_col_pivot.hpp"
+
 #include "expsum/cholesky_quasi_cauchy.hpp"
 
 namespace expsum

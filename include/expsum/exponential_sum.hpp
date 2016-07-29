@@ -1,14 +1,11 @@
 #ifndef EXPSUM_EXPONENTIAL_SUM_HPP
 #define EXPSUM_EXPONENTIAL_SUM_HPP
 
+#include <cassert>
 #include <iosfwd>
 #include <stdexcept>
 
 #include <armadillo>
-
-#include "expsum/cholesky_cauchy.hpp"
-#include "expsum/qr_col_pivot.hpp"
-#include "expsum/jacobi_svd.hpp"
 
 namespace expsum
 {
@@ -62,7 +59,7 @@ public:
         : exponent_(exponents), weight_(weights)
     {
         assert(exponents.is_vec() && weights.is_vec());
-        assert(exponents.size() == weights.size());
+        assert(exponents.n_elem == weights.n_elem);
     }
 
     // Default copy constructor
@@ -180,10 +177,6 @@ public:
         weight_   = std::move(tmp_w);
     }
     //
-    // Truncation
-    //
-    void truncate(argument_type tolerance);
-    //
     // Output to ostream
     //
     template <typename Ch, typename Tr>
@@ -221,53 +214,6 @@ private:
         weight_   = std::move(tmp);
     }
 };
-
-
-template <typename ResultT, typename ParamT>
-void exponential_sum<ResultT, ParamT>::truncate(argument_type tolerance)
-{
-    using matrix_type = arma::Mat<parameter_type>;
-    using real_vector_type = arma::Col<argument_type>;
-
-    // constexpr const auto eps = std::numeric_limits<argument_type>::epsilon();
-
-    const size_type n0 = size();
-    parameter_vector vec_a(exponent_);
-    parameter_vector vec_b(arma::sqrt(weight_));
-    cholesky_cauchy_rrd<parameter_type> chol(n0);
-
-    std::cout << "*** Cholesky quasi-Cauchy" << std::endl;
-    matrix_type L(chol.run(vec_a, vec_b, tolerance));
-
-    real_vector_type sigma(L.n_cols);
-
-    std::cout << "*** Jacobi SVD" << std::endl;
-    jacobi_svd<parameter_type> svj;
-    svj.run(L, sigma, /* compute_U = */ true);
-
-    for (size_type i = 0; i < sigma.size(); ++i)
-    {
-        std::cout << sigma(i) << '\t' << sigma(i) * sigma(i) << '\n';
-    }
-
-    std::cout << std::endl;
-
-    auto n1 = sigma.size();
-    auto eig_sum = argument_type();
-    for (; n1 > 0; --n1)
-    {
-        const auto dk = sigma(n1 - 1);
-        eig_sum += dk * dk;
-        if (2 * eig_sum > tolerance)
-        {
-            break;
-        }
-    }
-
-    std::cout << "*** after trucation: " << n1 << " terms" << std::endl;
-
-    return;
-}
 
 // Ostream operator
 template <typename Ch, typename Tr, typename ResultT, typename ParamT>

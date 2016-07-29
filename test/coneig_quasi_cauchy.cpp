@@ -41,13 +41,18 @@ void test_coneig_quasi_cauchy(size_type n)
 
     const auto delta = std::sqrt(n) * arma::Datum<real_type>::eps;
 
-    vector_type alpha = make_random_vector<T>(n);
-    vector_type gamma = make_random_vector<T>(n);
+    // vector_type alpha = make_random_vector<T>(n);
+    // vector_type gamma = make_random_vector<T>(n);
 
-    vector_type a = arma::sqrt(alpha) / gamma;
-    vector_type b = arma::sqrt(arma::conj(alpha));
-    vector_type x = T(1) / gamma;
-    vector_type y = arma::conj(-gamma);
+    // vector_type a = arma::sqrt(alpha) / gamma;
+    // vector_type b = arma::sqrt(arma::conj(alpha));
+    // vector_type x = T(1) / gamma;
+    // vector_type y = arma::conj(-gamma);
+
+    vector_type a(n, arma::fill::randu);
+    vector_type b(arma::conj(a));
+    vector_type x(n, arma::fill::randu);
+    vector_type y(arma::conj(x));
 
     matrix_type C(a.size(), a.size());
     for (size_type j = 0; j < a.size(); ++j)
@@ -87,7 +92,7 @@ int main()
 
     arma::arma_rng::set_seed_random();
     test_coneig_quasi_cauchy<double>(100);
-    test_coneig_quasi_cauchy<std::complex<double>>(50);
+    test_coneig_quasi_cauchy<std::complex<double>>(100);
 
     return 0;
 }

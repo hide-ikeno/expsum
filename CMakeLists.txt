@@ -44,14 +44,40 @@ endif()
 # REQUIRED external packages
 #===============================================================================
 
-# # External package directory
-# set(EXTERNAL_PROJECT_DIR ${PROJECT_SOURCE_DIR}/external)
-# add_subdirectory(external)
-# include_directories(${EXTERNAL_PROJECT_DIR}/include)
-# link_directories(${EXTERNAL_PROJECT_DIR}/lib)
+# External package directory
+set(EXTERNAL_PROJECT_DIR ${PROJECT_SOURCE_DIR}/external)
+add_subdirectory(external)
+include_directories(${EXTERNAL_PROJECT_DIR}/include)
+link_directories(${EXTERNAL_PROJECT_DIR}/lib64)
+link_directories(${EXTERNAL_PROJECT_DIR}/lib)
+
+include( ExternalProject )
+
+# Boost
+set(Boost_USE_STATIC_LIBS       OFF)
+set(Boost_USE_MULTITHREADED      ON)
+set(Boost_USE_STATIC_RUNTIME    OFF)
+
+find_package(Boost COMPONENTS python)
+if(Boost_FOUND)
+  include_directories(${Boost_INCLUDE_DIRS})
+else()
+  message(FATAL_ERROR "Cannot find boost libraries. Project will not be built.")
+endif()
+
+
+# Boost NumPy --- very fast C++ logging library
+ExternalProject_Add(
+  Boost.NumPy
+  PREFIX ${EXTERNAL_PROJECT_DIR}
+  GIT_REPOSITORY https://github.com/ndarray/Boost.NumPy.git
+  GIT_TAG "master"
+  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_PROJECT_DIR}
+  TEST_COMMAND ""
+  )
+
 
 # BLAS/LAPACK
-
 # BLAS / LAPACK
 set(BLAS_LAPACK_FOUND FALSE)
 set(EXPSUM_USE_MKL FALSE)
@@ -59,24 +85,24 @@ if (NOT BLAS_LAPACK_FOUND)
   set(MKL_SDL ON)
   find_package(MKL QUIET)
   if (MKL_FOUND)
-        set(BLAS_LAPACK_FOUND TRUE)
-        set(BLAS_LAPACK_LIBRARIES ${MKL_MINIMAL_LIBRARIES})
-        set(BLAS_LAPACK_INCLUDE_DIRS ${MKL_INCLUDE_DIRS})
-        set(CBLAS_INCLUDE_FILE   "mkl_cblas.h")
-        set(LAPACKE_INCLUDE_FILE "mkl_lapacke.h")
+    set(BLAS_LAPACK_FOUND TRUE)
+    set(BLAS_LAPACK_LIBRARIES ${MKL_MINIMAL_LIBRARIES})
+    set(BLAS_LAPACK_INCLUDE_DIRS ${MKL_INCLUDE_DIRS})
+    set(CBLAS_INCLUDE_FILE   "mkl_cblas.h")
+    set(LAPACKE_INCLUDE_FILE "mkl_lapacke.h")
 
-        set(EXPSUM_USE_MKL TRUE)
+    set(EXPSUM_USE_MKL TRUE)
   endif()
 endif()
 
 if (NOT BLAS_LAPACK_FOUND)
   find_package(OpenBLAS QUIET)
   if (OpenBLAS_FOUND)
-        set(BLAS_LAPACK_FOUND TRUE)
-        set(BLAS_LAPACK_LIBRARIES ${OpenBLAS_LIBRARIES})
-        set(BLAS_LAPACK_INCLUDE_DIRS ${OpenBLAS_INCLUDE_DIRS})
-        set(CBLAS_INCLUDE_FILE "cblas.h")
-        set(LAPACKE_INCLUDE_FILE "lapacke.h")
+    set(BLAS_LAPACK_FOUND TRUE)
+    set(BLAS_LAPACK_LIBRARIES ${OpenBLAS_LIBRARIES})
+    set(BLAS_LAPACK_INCLUDE_DIRS ${OpenBLAS_INCLUDE_DIRS})
+    set(CBLAS_INCLUDE_FILE "cblas.h")
+    set(LAPACKE_INCLUDE_FILE "lapacke.h")
   endif()
 endif()
 
@@ -114,6 +140,7 @@ endif()
 # Sub-directories
 #===============================================================================
 add_subdirectory(example)
+add_subdirectory(python)
 
 # Testing
 # include(CTest)
