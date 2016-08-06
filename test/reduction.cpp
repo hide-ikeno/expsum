@@ -2,7 +2,7 @@
 #include <iomanip>
 #include <iostream>
 
-#include "expsum/balanced_truncation.hpp"
+#include "expsum/reduction.hpp"
 
 using size_type = arma::uword;
 
@@ -32,7 +32,7 @@ arma::Col<T> make_random_vector(size_type n)
 // Test for coneig_quasi_cauchy
 //
 template <typename T>
-void test_balanced_truncation(size_type n)
+void test_reduction(size_type n)
 {
     using real_type   = typename arma::get_pod_type<T>::result;
     using vector_type = arma::Col<T>;
@@ -41,25 +41,14 @@ void test_balanced_truncation(size_type n)
 
     const auto delta = std::sqrt(n) * arma::Datum<real_type>::eps;
 
-    // vector_type a = make_random_vector<T>(n);
-    // vector_type w = make_random_vector<T>(n);
     vector_type a(n, arma::fill::randu);
     vector_type w(n, arma::fill::randu);
 
-    // matrix_type C(a.size(), a.size());
-    // for (size_type j = 0; j < a.size(); ++j)
-    // {
-    //     for (size_type i = 0; i < a.size(); ++i)
-    //     {
-    //         C(i, j) = a(i) * b(j) / (x(i) + y(j));
-    //     }
-    // }
-
     std::cout << "# quasi-Cauchy matrix of dimension " << a.size() << '\n';
-    expsum::balanced_truncation<T> trunc_body;
+    expsum::reduction_body<T> reduction;
     real_vector sigma;
     matrix_type X;
-    trunc_body.run(a, w, delta);
+    reduction.run(a, w, delta);
 
     // const auto n_coneigs = sigma.size();
     // vector_type work(n);
@@ -71,8 +60,8 @@ int main()
     std::cout.setf(std::ios::scientific);
 
     arma::arma_rng::set_seed_random();
-    test_balanced_truncation<double>(100);
-    test_balanced_truncation<std::complex<double>>(100);
+    test_reduction<double>(100);
+    test_reduction<std::complex<double>>(100);
 
     return 0;
 }
