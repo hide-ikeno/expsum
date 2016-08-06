@@ -242,6 +242,21 @@ public:
         d_.set_size(n);
         X_.set_size(n, n);
     }
+
+private:
+    //
+    // Compute Cholesky decomposition of quasi-Cauchy matrix by Gaussian
+    // elimination with complete pivoting.
+    //
+    // Factorize the matrix P = diagmat(a)  / (x + conj(x)) * diagmat(conj(a))
+    // as
+    //
+    //   P = L * D^2 * L.t()
+    //
+    // where L is unit triangular with size (n x m), and D is a (m x m) diagonal
+    // matrix, where m is the extracted rank of the matrix P.
+    //
+    size_type cholesky_rrd(vector_type& a, vector_type& x, real_type tol);
 };
 
 template <typename T>
@@ -249,7 +264,7 @@ template <typename VecP, typename VecW>
 typename std::enable_if<(arma::is_basevec<VecP>::value &&
                          arma::is_basevec<VecW>::value),
                         void>::type
-reduction_body<T>::run(const VecP& p, const VecW& w, real_type delta)
+reduction_body<T>::run(const VecP& p, const VecW& w, real_type tol)
 {
     const auto n = p.size();
     assert(w.size() == n);
@@ -258,6 +273,16 @@ reduction_body<T>::run(const VecP& p, const VecW& w, real_type delta)
     vector_type a(arma::sqrt(w));
     vector_type x(p);
 
+    cholesky_rrd(a, x, tol);
+}
+
+template <typename T>
+typename reduction_body<T>::size_type
+reduction_body<T>::cholesky_rrd(vector_type& a, vector_type& x, real_type delta)
+{
+    const size_type n = a.size();
+
+#ifdef DEBUG
     matrix_type P(n, n);
     for (size_type j = 0; j < n; ++j)
     {
@@ -266,27 +291,29 @@ reduction_body<T>::run(const VecP& p, const VecW& w, real_type delta)
             P(i, j) = a(i) * numeric::conj(a(j)) / (x(i) + numeric::conj(x(j)));
         }
     }
-    //
-    // Rank-revealing Cholesky decomposition of the matrix P with
-    //   P(i, j) = a(i) * conj(a(j)) / (x(i) + conj(x(j)));
-    //
-    //  Factorization P = L * D^2 * L.t()
-    //
+#endif
+
     vector_type work_(n);
     real_vector_type g(reinterpret_cast<real_type*>(work_.memptr()), n,
                        /*copy_aux_mem*/ false, /*strict*/ true);
+    // Pre-compute correct pivot order of Cholesky decomposition
     const size_type m =
         detail::cholesky_quasi_cauchy<T>::pivot_order(a, x, ipiv_, delta, g);
     matrix_type L(X_.memptr(), n, m, false, true);
     real_vector_type d(d_.memptr(), m, false, true);
+    // Compute Cholesky factors
     detail::cholesky_quasi_cauchy<T>::factorize(a, x, L, d, work_);
     // Apply permutation matrix
     detail::cholesky_quasi_cauchy<T>::apply_row_permutation(L, ipiv_, work_);
 
+#ifdef DEBUG
     std::cout << "*** Cholesky-Cauchy:\n"
               << "    |P - L * D^2 * L.t()| = "
               << arma::norm(P - L * arma::diagmat(arma::square(d)) * L.t())
               << std::endl;
+#endif
+
+    return m;
 }
 
 } // namespace: expsum
