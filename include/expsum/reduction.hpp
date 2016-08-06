@@ -3,9 +3,13 @@
 
 #include <algorithm>
 #include <cassert>
+#include <sstream>
+#include <stdexcept>
 
-#include "expsum/numeric.hpp"
 #include <armadillo>
+
+#include "expsum/jacobi_svd.hpp"
+#include "expsum/numeric.hpp"
 
 namespace expsum
 {
@@ -225,9 +229,14 @@ public:
     using complex_matrix_type = arma::Mat<complex_type>;
 
 private:
+    size_type size_;
+    vector_type exponent_;
+    vector_type weight_;
+
     arma::uvec ipiv_;
-    real_vector_type d_;
-    matrix_type X_;
+    matrix_type work1_;
+    matrix_type work2_;
+    matrix_type work3_;
 
 public:
     template <typename VecP, typename VecW>
@@ -238,9 +247,30 @@ public:
 
     void resize(size_type n)
     {
-        ipiv_.set_size(n);
-        d_.set_size(n);
-        X_.set_size(n, n);
+        if (exponent_.size() < n)
+        {
+            exponent_.set_size(n);
+            weight_.set_size(n);
+            ipiv_.set_size(n);
+            work1_.set_size(n, n);
+            work2_.set_size(n, n);
+            work3_.set_size(n, n);
+        }
+    }
+
+    //
+    // @return Vector view to the exponents.
+    //
+    auto exponents() const -> decltype(exponent_.head(size_))
+    {
+        return exponent_.head(size_);
+    }
+    //
+    // @return Vector view to the weights.
+    //
+    auto weights() const -> decltype(weight_.head(size_))
+    {
+        return weight_.head(size_);
     }
 
 private:
@@ -256,7 +286,21 @@ private:
     // where L is unit triangular with size (n x m), and D is a (m x m) diagonal
     // matrix, where m is the extracted rank of the matrix P.
     //
-    size_type cholesky_rrd(vector_type& a, vector_type& x, real_type tol);
+    static size_type cholesky_rrd(vector_type& a, vector_type& x,
+                                  real_type delta, arma::uvec& ipiv,
+                                  value_type* L, real_type* d,
+                                  vector_type& work);
+    //
+    // Eigenvalue decomposition of the product of Gramian matrices
+    //
+    //   conj(P) * P = U * diagmat(sigma) * U.t()
+    //
+    // where P has a RRD of the form, P = X * D^2 * X.t()
+    //
+    static void eig_prod_gramian(size_type n, size_type m, value_type* ptr_X,
+                                 real_type* ptr_d, real_type* ptr_dinv,
+                                 value_type* ptr_U, value_type* ptr_W);
+    // void eig_prod_gramian(matrix_type X, real_vector_type& d);
 };
 
 template <typename T>
@@ -269,16 +313,55 @@ reduction_body<T>::run(const VecP& p, const VecW& w, real_type tol)
     const auto n = p.size();
     assert(w.size() == n);
     resize(n);
+    if (n <= size_type(1))
+    {
+        return;
+    }
 
-    vector_type a(arma::sqrt(w));
-    vector_type x(p);
+    real_type* ptr_d    = reinterpret_cast<real_type*>(exponent_.memptr());
+    real_type* ptr_dinv = reinterpret_cast<real_type*>(weight_.memptr());
+    value_type* ptr_L   = work1_.memptr();
+    {
+        value_type* ptr_a    = weight_.memptr();
+        value_type* ptr_x    = work2_.memptr();
+        value_type* ptr_work = work2_.colptr(1);
 
-    cholesky_rrd(a, x, tol);
+        vector_type a(ptr_a, n, false, true);
+        vector_type x(ptr_x, n, false, true);
+        vector_type work(ptr_work, n, false, true);
+        a     = arma::sqrt(w);
+        x     = p;
+        size_ = cholesky_rrd(a, x, tol, ipiv_, ptr_L, ptr_d, work);
+
+        for (size_type i = 0; i < size_; ++i)
+        {
+            ptr_dinv[i] = real_type(1) / ptr_d[i];
+        }
+    }
+
+    value_type* ptr_U = work2_.memptr();
+    {
+        eig_prod_gramian(n, size_, ptr_L, ptr_d, ptr_dinv, ptr_U,
+                         work3_.memptr());
+        auto sum_d  = real_type();
+        size_type k = size_;
+        while (k)
+        {
+            sum_d += ptr_d[k - 1];
+            if (2 * sum_d > tol)
+            {
+                break;
+            }
+            --k;
+        }
+    }
 }
 
 template <typename T>
 typename reduction_body<T>::size_type
-reduction_body<T>::cholesky_rrd(vector_type& a, vector_type& x, real_type delta)
+reduction_body<T>::cholesky_rrd(vector_type& a, vector_type& x, real_type delta,
+                                arma::uvec& ipiv, value_type* ptr_L,
+                                real_type* ptr_d, vector_type& work)
 {
     const size_type n = a.size();
 
@@ -293,18 +376,17 @@ reduction_body<T>::cholesky_rrd(vector_type& a, vector_type& x, real_type delta)
     }
 #endif
 
-    vector_type work_(n);
-    real_vector_type g(reinterpret_cast<real_type*>(work_.memptr()), n,
+    real_vector_type g(reinterpret_cast<real_type*>(work.memptr()), n,
                        /*copy_aux_mem*/ false, /*strict*/ true);
     // Pre-compute correct pivot order of Cholesky decomposition
     const size_type m =
-        detail::cholesky_quasi_cauchy<T>::pivot_order(a, x, ipiv_, delta, g);
-    matrix_type L(X_.memptr(), n, m, false, true);
-    real_vector_type d(d_.memptr(), m, false, true);
+        detail::cholesky_quasi_cauchy<T>::pivot_order(a, x, ipiv, delta, g);
+    matrix_type L(ptr_L, n, m, false, true);
+    real_vector_type d(ptr_d, m, false, true);
     // Compute Cholesky factors
-    detail::cholesky_quasi_cauchy<T>::factorize(a, x, L, d, work_);
+    detail::cholesky_quasi_cauchy<T>::factorize(a, x, L, d, work);
     // Apply permutation matrix
-    detail::cholesky_quasi_cauchy<T>::apply_row_permutation(L, ipiv_, work_);
+    detail::cholesky_quasi_cauchy<T>::apply_row_permutation(L, ipiv, work);
 
 #ifdef DEBUG
     std::cout << "*** Cholesky-Cauchy:\n"
@@ -314,6 +396,115 @@ reduction_body<T>::cholesky_rrd(vector_type& a, vector_type& x, real_type delta)
 #endif
 
     return m;
+}
+
+template <typename T>
+void reduction_body<T>::eig_prod_gramian(size_type n, size_type m,
+                                         value_type* ptr_X, real_type* ptr_d,
+                                         real_type* ptr_dinv, value_type* ptr_U,
+                                         value_type* ptr_Y)
+{
+    matrix_type X(ptr_X, n, m, false, true);
+    real_vector_type d(ptr_d, m, false, true);
+    real_vector_type dinv(ptr_dinv, m, false, true);
+
+    matrix_type G(ptr_U, m, m, false, true);
+
+    auto D    = arma::diagmat(d);
+    auto Dinv = arma::diagmat(dinv);
+
+    // matrix_type P(X * arma::diagmat(arma::square(d)) * X.t());
+
+    //
+    // Form G = D * (X.st() * X) * D
+    //
+    G = D * X.st() * X * D;
+    //
+    // Compute G = Q * R by Householder QR factorization
+    //
+    {
+        auto m_         = static_cast<arma::blas_int>(m);
+        auto lwork_     = static_cast<arma::blas_int>(n * (n - 1));
+        value_type* tau = ptr_Y;
+        arma::blas_int info;
+        arma::lapack::geqrf(&m_, &m_, G.memptr(), &m_, tau, ptr_Y + m, &lwork_,
+                            &info);
+        if (info)
+        {
+            std::ostringstream msg;
+            msg << "(reduction_body::eig_prod_gramian) xGEQRF failed with "
+                   "info "
+                << info;
+            throw std::runtime_error(msg.str());
+        }
+    }
+    //
+    // Compute SVD of R = Y * S * V.t() using one-sided Jacobi method. We need
+    // singular values and left singular vectors here.
+    //
+    matrix_type Y(ptr_Y, m, m, false, true);
+    // overwrite d by singular value sigma
+    real_vector_type sigma(ptr_d, m, false, true);
+    Y.zeros();
+    Y               = arma::trimatu(G); // U = R
+    const auto ctol = arma::Datum<real_type>::eps * std::sqrt(real_type(m));
+    jacobi_svd(Y, sigma, ctol);
+    //
+    // The eigenvectors of conj(P) * P are obtained as conj(X) * D * conj(V)
+    //
+    // Compute X1 = D^(-1) * U * S^{1/2}
+    //
+    for (size_type j = 0; j < m; ++j)
+    {
+        const auto sj = std::sqrt(sigma(j));
+        for (size_type i = 0; i < m; ++i)
+        {
+            Y(i, j) *= sj * dinv(i);
+        }
+    }
+
+    //
+    // Compute R1 = D^(-1) * (R * P.t()) * D^(-1)
+    //
+    std::cout << "***** R1 = D^(-1) * R * D^(-1)" << std::endl;
+    for (size_type j = 0; j < m; ++j)
+    {
+        for (size_type i = 0; i <= j; ++i)
+        {
+            G(i, j) *= dinv(i) * dinv(j);
+        }
+    }
+
+    //
+    // Solve R1 * Y1 = X1 in-place
+    //
+    std::cout << "***** solve R1 * Y1 = X1" << std::endl;
+    {
+        char uplo  = 'U';
+        char trans = 'N';
+        char diag  = 'N';
+        auto m_    = static_cast<arma::blas_int>(m);
+        auto nrhs_ = m_;
+        arma::blas_int info;
+        arma::lapack::trtrs(&uplo, &trans, &diag, &m_, &nrhs_, G.memptr(), &m_,
+                            Y.memptr(), &m_, &info);
+        if (info)
+        {
+            std::ostringstream msg;
+            msg << "(reduction_body::eig_prod_gramian) xTRTRS failed with "
+                   "info "
+                << info;
+            throw std::runtime_error(msg.str());
+        }
+    }
+    matrix_type U(ptr_U, n, m, false, true);
+    U = arma::conj(X) * arma::conj(Y);
+
+    // for (size_type j = 0; j < m; ++j)
+    // {
+    //     std::cout << sigma(j) << '\t' << arma::norm(U.col(j)) << '\t'
+    //               << arma::norm(P * U.col(j) - sigma(j) * U.col(j)) << '\n';
+    // }
 }
 
 } // namespace: expsum

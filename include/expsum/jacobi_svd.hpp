@@ -21,7 +21,7 @@ namespace detail
 //  J = [ cs conj(sn)]
 //      [-sn conj(cs)]
 //
-// that diagonalize the 2x2 matirix
+// that diagonalize the 2x2 matrix
 //
 // B = [     a  c]
 //     [conj(c) b]
