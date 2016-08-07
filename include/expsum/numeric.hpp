@@ -40,6 +40,21 @@ T abs2(const std::complex<T>& x)
 }
 
 //
+// Compute phase angle of complex number. If `T` is real type, return 0.
+//
+template <typename T>
+T arg(const T&)
+{
+    return T();
+}
+
+template <typename T>
+T arg(const std::complex<T>& x)
+{
+    return std::arg(x);
+}
+
+//
 // Fused multiply-add
 //
 // Computes `(x * y) + z` as if to infinite precision and rounded only once to

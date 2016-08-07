@@ -60,7 +60,7 @@ int main()
     std::cout.setf(std::ios::scientific);
 
     arma::arma_rng::set_seed_random();
-    test_reduction<double>(100);
+    // test_reduction<double>(100);
     test_reduction<std::complex<double>>(100);
 
     return 0;

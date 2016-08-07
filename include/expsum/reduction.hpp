@@ -297,9 +297,9 @@ private:
     //
     // where P has a RRD of the form, P = X * D^2 * X.t()
     //
-    static void eig_prod_gramian(size_type n, size_type m, value_type* ptr_X,
-                                 real_type* ptr_d, real_type* ptr_dinv,
-                                 value_type* ptr_U, value_type* ptr_W);
+    static void coneig_gramian(size_type n, size_type m, value_type* ptr_X,
+                               real_type* ptr_d, real_type* ptr_dinv,
+                               value_type* ptr_U, value_type* ptr_W);
     // void eig_prod_gramian(matrix_type X, real_vector_type& d);
 };
 
@@ -341,8 +341,8 @@ reduction_body<T>::run(const VecP& p, const VecW& w, real_type tol)
 
     value_type* ptr_U = work2_.memptr();
     {
-        eig_prod_gramian(n, size_, ptr_L, ptr_d, ptr_dinv, ptr_U,
-                         work3_.memptr());
+        coneig_gramian(n, size_, ptr_L, ptr_d, ptr_dinv, ptr_U,
+                       work3_.memptr());
         auto sum_d  = real_type();
         size_type k = size_;
         while (k)
@@ -399,10 +399,10 @@ reduction_body<T>::cholesky_rrd(vector_type& a, vector_type& x, real_type delta,
 }
 
 template <typename T>
-void reduction_body<T>::eig_prod_gramian(size_type n, size_type m,
-                                         value_type* ptr_X, real_type* ptr_d,
-                                         real_type* ptr_dinv, value_type* ptr_U,
-                                         value_type* ptr_Y)
+void reduction_body<T>::coneig_gramian(size_type n, size_type m,
+                                       value_type* ptr_X, real_type* ptr_d,
+                                       real_type* ptr_dinv, value_type* ptr_U,
+                                       value_type* ptr_Y)
 {
     matrix_type X(ptr_X, n, m, false, true);
     real_vector_type d(ptr_d, m, false, true);
@@ -413,7 +413,7 @@ void reduction_body<T>::eig_prod_gramian(size_type n, size_type m,
     auto D    = arma::diagmat(d);
     auto Dinv = arma::diagmat(dinv);
 
-    // matrix_type P(X * arma::diagmat(arma::square(d)) * X.t());
+    matrix_type P(X * arma::diagmat(arma::square(d)) * X.t());
 
     //
     // Form G = D * (X.st() * X) * D
@@ -446,8 +446,9 @@ void reduction_body<T>::eig_prod_gramian(size_type n, size_type m,
     // overwrite d by singular value sigma
     real_vector_type sigma(ptr_d, m, false, true);
     Y.zeros();
-    Y               = arma::trimatu(G); // U = R
-    const auto ctol = arma::Datum<real_type>::eps * std::sqrt(real_type(m));
+    Y = arma::trimatu(G); // U = R
+    // const auto ctol = arma::Datum<real_type>::eps * std::sqrt(real_type(m));
+    const auto ctol = arma::Datum<real_type>::eps;
     jacobi_svd(Y, sigma, ctol);
     //
     // The eigenvectors of conj(P) * P are obtained as conj(X) * D * conj(V)
@@ -498,13 +499,28 @@ void reduction_body<T>::eig_prod_gramian(size_type n, size_type m,
         }
     }
     matrix_type U(ptr_U, n, m, false, true);
-    U = arma::conj(X) * arma::conj(Y);
+    // U = arma::conj(X) * arma::conj(Y);
+    U = X * Y;
 
-    // for (size_type j = 0; j < m; ++j)
-    // {
-    //     std::cout << sigma(j) << '\t' << arma::norm(U.col(j)) << '\t'
-    //               << arma::norm(P * U.col(j) - sigma(j) * U.col(j)) << '\n';
-    // }
+    if (arma::is_complex<T>::value)
+    {
+        // conj(A) * A = U * S * U.t()
+        for (size_type j = 0; j < m; ++j)
+        {
+            auto uj = U.col(j);
+            // auto phi   = numeric::arg(arma::dot(uj, uj));
+            // auto phase = std::polar(real_type(1), -phi / 2);
+            // uj *= phase;
+            auto d     = arma::dot(uj, uj);
+            auto phase = d / std::abs(d);
+            auto scale = std::sqrt(numeric::conj(phase));
+            uj *= scale;
+            std::cout << sigma(j) << '\t' << arma::norm(uj) << '\t'
+                      << std::abs(d) << '\t'
+                      << arma::norm(P * arma::conj(uj) - sigma(j) * uj) << '\t'
+                      << arma::norm(P * uj - sigma(j) * arma::conj(uj)) << '\n';
+        }
+    }
 }
 
 } // namespace: expsum

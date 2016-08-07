@@ -45,36 +45,36 @@ endif()
 #===============================================================================
 
 # External package directory
-set(EXTERNAL_PROJECT_DIR ${PROJECT_SOURCE_DIR}/external)
-add_subdirectory(external)
-include_directories(${EXTERNAL_PROJECT_DIR}/include)
-link_directories(${EXTERNAL_PROJECT_DIR}/lib64)
-link_directories(${EXTERNAL_PROJECT_DIR}/lib)
+# set(EXTERNAL_PROJECT_DIR ${PROJECT_SOURCE_DIR}/external)
+# add_subdirectory(external)
+# include_directories(${EXTERNAL_PROJECT_DIR}/include)
+# link_directories(${EXTERNAL_PROJECT_DIR}/lib64)
+# link_directories(${EXTERNAL_PROJECT_DIR}/lib)
+# 
+# include( ExternalProject )
 
-include( ExternalProject )
-
-# Boost
-set(Boost_USE_STATIC_LIBS       OFF)
-set(Boost_USE_MULTITHREADED      ON)
-set(Boost_USE_STATIC_RUNTIME    OFF)
-
-find_package(Boost COMPONENTS python)
-if(Boost_FOUND)
-  include_directories(${Boost_INCLUDE_DIRS})
-else()
-  message(FATAL_ERROR "Cannot find boost libraries. Project will not be built.")
-endif()
+# # Boost
+# set(Boost_USE_STATIC_LIBS       OFF)
+# set(Boost_USE_MULTITHREADED      ON)
+# set(Boost_USE_STATIC_RUNTIME    OFF)
+# 
+# find_package(Boost COMPONENTS python)
+# if(Boost_FOUND)
+#   include_directories(${Boost_INCLUDE_DIRS})
+# else()
+#   message(FATAL_ERROR "Cannot find boost libraries. Project will not be built.")
+# endif()
 
 
-# Boost NumPy --- very fast C++ logging library
-ExternalProject_Add(
-  Boost.NumPy
-  PREFIX ${EXTERNAL_PROJECT_DIR}
-  GIT_REPOSITORY https://github.com/ndarray/Boost.NumPy.git
-  GIT_TAG "master"
-  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_PROJECT_DIR}
-  TEST_COMMAND ""
-  )
+# # Boost NumPy --- very fast C++ logging library
+# ExternalProject_Add(
+#   Boost.NumPy
+#   PREFIX ${EXTERNAL_PROJECT_DIR}
+#   GIT_REPOSITORY https://github.com/ndarray/Boost.NumPy.git
+#   GIT_TAG "master"
+#   CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_PROJECT_DIR}
+#   TEST_COMMAND ""
+#   )
 
 
 # BLAS/LAPACK
@@ -140,7 +140,7 @@ endif()
 # Sub-directories
 #===============================================================================
 add_subdirectory(example)
-add_subdirectory(python)
+# add_subdirectory(python)
 
 # Testing
 # include(CTest)
