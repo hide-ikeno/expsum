@@ -41,19 +41,15 @@ void test_reduction(size_type n)
 
     const auto delta = std::sqrt(n) * arma::Datum<real_type>::eps;
 
-    // vector_type a(n, arma::fill::randu);
-    // vector_type w(n, arma::fill::randu);
-    vector_type a(make_random_vector<T>(n));
-    vector_type w(make_random_vector<T>(n));
+    vector_type a(n, arma::fill::randu);
+    vector_type w(n, arma::fill::randu);
+    // vector_type a(make_random_vector<T>(n));
+    // vector_type w(make_random_vector<T>(n));
 
-    std::cout << "# quasi-Cauchy matrix of dimension " << a.size() << '\n';
     expsum::reduction_body<T> reduction;
     real_vector sigma;
     matrix_type X;
     reduction.run(a, w, delta);
-
-    // const auto n_coneigs = sigma.size();
-    // vector_type work(n);
 }
 
 int main()
@@ -62,8 +58,24 @@ int main()
     std::cout.setf(std::ios::scientific);
 
     arma::arma_rng::set_seed_random();
-    test_reduction<double>(200);
-    test_reduction<std::complex<double>>(100);
+
+    const size_type n       = 200;
+    const size_type n_trial = 20;
+
+    std::cout << "# real quasi-cauchy matrix of dimension " << n << '\n';
+
+    for (size_type i = 0; i < n_trial; ++i)
+    {
+        std::cout << "--- trial " << i + 1 << '\n';
+        test_reduction<double>(n);
+    }
+
+    std::cout << "# complex quasi-cauchy matrix of dimension " << n << '\n';
+    for (size_type i = 0; i < n_trial; ++i)
+    {
+        std::cout << "--- trial " << i + 1 << '\n';
+        test_reduction<std::complex<double>>(n);
+    }
 
     return 0;
 }
