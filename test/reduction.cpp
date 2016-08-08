@@ -41,8 +41,10 @@ void test_reduction(size_type n)
 
     const auto delta = std::sqrt(n) * arma::Datum<real_type>::eps;
 
-    vector_type a(n, arma::fill::randu);
-    vector_type w(n, arma::fill::randu);
+    // vector_type a(n, arma::fill::randu);
+    // vector_type w(n, arma::fill::randu);
+    vector_type a(make_random_vector<T>(n));
+    vector_type w(make_random_vector<T>(n));
 
     std::cout << "# quasi-Cauchy matrix of dimension " << a.size() << '\n';
     expsum::reduction_body<T> reduction;
@@ -60,7 +62,7 @@ int main()
     std::cout.setf(std::ios::scientific);
 
     arma::arma_rng::set_seed_random();
-    // test_reduction<double>(100);
+    test_reduction<double>(200);
     test_reduction<std::complex<double>>(100);
 
     return 0;

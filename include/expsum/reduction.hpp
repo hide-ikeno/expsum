@@ -499,8 +499,7 @@ void reduction_body<T>::coneig_gramian(size_type n, size_type m,
         }
     }
     matrix_type U(ptr_U, n, m, false, true);
-    // U = arma::conj(X) * arma::conj(Y);
-    U = X * Y;
+    U = arma::conj(X) * arma::conj(Y);
 
     if (arma::is_complex<T>::value)
     {
@@ -511,15 +510,20 @@ void reduction_body<T>::coneig_gramian(size_type n, size_type m,
             // auto phi   = numeric::arg(arma::dot(uj, uj));
             // auto phase = std::polar(real_type(1), -phi / 2);
             // uj *= phase;
-            auto d     = arma::dot(uj, uj);
-            auto phase = d / std::abs(d);
+            // auto d     = arma::dot(uj, uj);
+            // auto phase = d / std::abs(d);
+            auto phase = arma::dot(uj, uj);
             auto scale = std::sqrt(numeric::conj(phase));
             uj *= scale;
-            std::cout << sigma(j) << '\t' << arma::norm(uj) << '\t'
-                      << std::abs(d) << '\t'
-                      << arma::norm(P * arma::conj(uj) - sigma(j) * uj) << '\t'
-                      << arma::norm(P * uj - sigma(j) * arma::conj(uj)) << '\n';
         }
+    }
+
+    for (size_type j = 0; j < m; ++j)
+    {
+        auto uj = U.col(j);
+        std::cout << sigma(j) << '\t' << arma::norm(uj) << '\t'
+                  << arma::norm(P * arma::conj(uj) - sigma(j) * uj) << '\t'
+                  << arma::norm(P * uj - sigma(j) * arma::conj(uj)) << '\n';
     }
 }
 
