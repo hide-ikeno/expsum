@@ -270,14 +270,13 @@ void coneig_sym_rrd<T>::run(matrix_type& X, real_vector_type& d,
     //
     // Solve R1 * Y1 = X1 in-place
     //
-    tri_solve(G, U);
+    tri_solve(R, U);
     //
-    // Compute con-eigenvectors U = conj(X) * conj(Y)
-    // Here G is used as temporary matrix, and X is overwritten by U.
+    // Compute con-eigenvectors U = conj(X) * conj(Y).
     //
     X = arma::conj(X) * arma::conj(U);
     //
-    // Adjust phase factor of each con-eigenvectors
+    // Adjust phase factor of each con-eigenvectors, so that U^{T} * U = I
     //
     if (arma::is_complex<T>::value)
     {

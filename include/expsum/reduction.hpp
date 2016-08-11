@@ -95,6 +95,10 @@ reduction_body<T>::run(const VecP& p, const VecW& w, real_type tol)
     value_type* ptr_a = ptr_X + n * n;
     real_type* ptr_d  = reinterpret_cast<real_type*>(exponent_.memptr());
 
+#ifdef DEBUG
+    matrix_type P(n, n);
+#endif /* DEBUG */
+
     //
     // Rank-revealing Cholesky factorization of quasi-Cauchy matrix
     //
@@ -111,7 +115,6 @@ reduction_body<T>::run(const VecP& p, const VecW& w, real_type tol)
     y = arma::conj(x);
 
 #ifdef DEBUG
-    matrix_type P(n, n);
     for (size_type j = 0; j < n; ++j)
     {
         for (size_type i = 0; i < n; ++i)
@@ -131,27 +134,27 @@ reduction_body<T>::run(const VecP& p, const VecW& w, real_type tol)
     cholesky_rrd::factorize(a, b, x, y, X, d, work1, work2);
     cholesky_rrd::apply_row_permutation(X, ipiv_, work1);
 
-//
-// Compute con-eigenvalue decomposition of matrix C = X * D^2 * X.t()
-//
-//
-// Required memory for workspace
-//
-// work size:
-//    for matrix G : n * n
-//    for matrix Y : n * n
-//    for workspace: 2 * n
-//    ------------------------------
-//    Total        : 2 * n * (n + 1)
-//
-// rwork size:
-//    if `T` is real type   : n
-//    if `T` is complex type: 3 * n
-//
 #ifdef DEBUG
     std::cout << "*** coneig_sym_rrd:" << std::endl;
 #endif /* DEBUG */
 
+    //
+    // Compute con-eigenvalue decomposition of matrix C = X * D^2 * X.t()
+    //
+    //
+    // NOTE: Required memory for workspace
+    //
+    // work size:
+    //    for matrix G : n * n
+    //    for matrix Y : n * n
+    //    for workspace: 2 * n
+    //    ------------------------------
+    //    Total        : 2 * n * (n + 1)
+    //
+    // rwork size:
+    //    if `T` is real type   : n
+    //    if `T` is complex type: 3 * n
+    //
     coneig_sym_rrd<T>::run(X, d, ptr_a, rwork_.memptr());
 
 #ifdef DEBUG
@@ -178,8 +181,22 @@ reduction_body<T>::run(const VecP& p, const VecW& w, real_type tol)
         }
         --k;
     }
+    size_ = k;
 
     std::cout << "*** truncation size = " << k << std::endl;
+    if (k == size_type())
+    {
+        return;
+    }
+
+    auto viewX = X.head_cols(k);
+    matrix_type A(ptr_a, k, k, false, true);
+
+    a = p;
+    b = viewX.st() * arma::sqrt(w);
+    A = viewX.st() * arma::diagmat(a) * viewX;
+
+    return;
 }
 
 } // namespace: expsum

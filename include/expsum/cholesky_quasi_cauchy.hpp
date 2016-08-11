@@ -49,8 +49,8 @@ public:
     // @y vector of length ``$n$`` defining quasi-Cauchy matrix (reordered)
     // @L Cholesky factor (lower triangular matrix)
     // @d diagonal elements of Cholesky factor ``$D$``
-    // @alpha working space
-    // @beta  working space
+    // @alpha vector of length ``$n$`` as working space
+    // @beta  vector of length ``$n$`` as working space
     //
     static void factorize(const vector_type& a, const vector_type& b,
                           const vector_type& x, const vector_type& y,
