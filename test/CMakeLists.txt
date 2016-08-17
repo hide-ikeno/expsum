@@ -7,5 +7,5 @@ add_test_numeric(cholesky_quasi_cauchy)
 add_test_numeric(hankel_matrix)
 add_test_numeric(jacobi_svd)
 add_test_numeric(vandermonde_matrix)
-add_test_numeric(reduction)
+add_test_numeric(balanced_truncation)
 

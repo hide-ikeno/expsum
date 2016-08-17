@@ -2,10 +2,9 @@
 #include <iomanip>
 #include <iostream>
 
-#include "expsum/reduction.hpp"
+#include "expsum/balanced_truncation.hpp"
 
 using size_type = arma::uword;
-
 //
 // Make random vector of given size with elemnts x[i] whose absolute value is
 // less than unity.
@@ -27,12 +26,11 @@ arma::Col<T> make_random_vector(size_type n)
         return arma::Col<T>(n, arma::fill::randu);
     }
 }
-
 //
 // Test for coneig_quasi_cauchy
 //
 template <typename T>
-void test_reduction(size_type n)
+void test_balanced_truncation(size_type n)
 {
     using real_type   = typename arma::get_pod_type<T>::result;
     using vector_type = arma::Col<T>;
@@ -46,10 +44,10 @@ void test_reduction(size_type n)
     // vector_type a(make_random_vector<T>(n));
     // vector_type w(make_random_vector<T>(n));
 
-    expsum::reduction_body<T> reduction;
+    expsum::balanced_truncation<T> truncation;
     real_vector sigma;
     matrix_type X;
-    reduction.run(a, w, delta);
+    truncation.run(a, w, delta);
 }
 
 int main()
@@ -67,14 +65,14 @@ int main()
     for (size_type i = 0; i < n_trial; ++i)
     {
         std::cout << "--- trial " << i + 1 << '\n';
-        test_reduction<double>(n);
+        test_balanced_truncation<double>(n);
     }
 
     std::cout << "# complex quasi-cauchy matrix of dimension " << n << '\n';
     for (size_type i = 0; i < n_trial; ++i)
     {
         std::cout << "--- trial " << i + 1 << '\n';
-        test_reduction<std::complex<double>>(n);
+        test_balanced_truncation<std::complex<double>>(n);
     }
 
     return 0;

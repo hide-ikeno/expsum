@@ -30,6 +30,7 @@ namespace expsum
 //     On entry, the diagonal elements of rank-revealing factor $D$. The
 //     diagonal of $D$ must be all positive and decreasing.
 //     On exit, con-eigenvalues of the matrix $A$.
+// @threshold threshold value for con-eigenvalues.
 //
 
 template <typename T>
@@ -51,8 +52,9 @@ public:
     using complex_vector_type = arma::Col<complex_type>;
     using complex_matrix_type = arma::Mat<complex_type>;
 
-    static void run(matrix_type& X, real_vector_type& d, value_type* work,
-                    real_type* rwork);
+    static size_type run(matrix_type& X, real_vector_type& d,
+                         real_type threshold, value_type* work,
+                         real_type* rwork);
 
 private:
     //
@@ -192,8 +194,9 @@ private:
 //    if `T` is complex type: 3 * n
 //
 template <typename T>
-void coneig_sym_rrd<T>::run(matrix_type& X, real_vector_type& d,
-                            value_type* work, real_type* rwork)
+typename coneig_sym_rrd<T>::size_type
+coneig_sym_rrd<T>::run(matrix_type& X, real_vector_type& d, real_type threshold,
+                       value_type* work, real_type* rwork)
 {
     // const size_type m = X.n_rows;
     const size_type n = X.n_cols;
@@ -232,6 +235,26 @@ void coneig_sym_rrd<T>::run(matrix_type& X, real_vector_type& d,
     jacobi_svd(U, sigma, ptr3, rwork + n);
 
     //-------------------------------------------------------------------------
+    // Truncation: discard con-eigenvalues if negligibly small
+    //-------------------------------------------------------------------------
+    auto sum_d     = real_type();
+    size_type nvec = n;
+    while (nvec)
+    {
+        sum_d += d(nvec - 1);
+        if (2 * sum_d > threshold)
+        {
+            break;
+        }
+        --nvec;
+    }
+
+    if (nvec == size_type(0))
+    {
+        return size_type();
+    }
+
+    //-------------------------------------------------------------------------
     //
     // The eigenvectors of A * conj(A) are given as
     //
@@ -249,12 +272,13 @@ void coneig_sym_rrd<T>::run(matrix_type& X, real_vector_type& d,
     //
     // Compute X1 = D^(-1) * U * S^{1/2} [in-place]
     //
-    for (size_type j = 0; j < n; ++j)
+    matrix_type U_trunc(ptr2, n, nvec, false, true);
+    for (size_type j = 0; j < nvec; ++j)
     {
         const auto sj = std::sqrt(sigma(j));
         for (size_type i = 0; i < n; ++i)
         {
-            U(i, j) *= sj * dinv(i);
+            U_trunc(i, j) *= sj * dinv(i);
         }
     }
     //
@@ -270,17 +294,17 @@ void coneig_sym_rrd<T>::run(matrix_type& X, real_vector_type& d,
     //
     // Solve R1 * Y1 = X1 in-place
     //
-    tri_solve(R, U);
+    tri_solve(R, U_trunc);
     //
     // Compute con-eigenvectors U = conj(X) * conj(Y).
     //
-    X = arma::conj(X) * arma::conj(U);
+    X.head_cols(nvec) = arma::conj(X) * arma::conj(U_trunc);
     //
     // Adjust phase factor of each con-eigenvectors, so that U^{T} * U = I
     //
     if (arma::is_complex<T>::value)
     {
-        for (size_type j = 0; j < n; ++j)
+        for (size_type j = 0; j < nvec; ++j)
         {
             auto xj          = X.col(j);
             const auto t     = arma::dot(xj, xj);
@@ -290,7 +314,7 @@ void coneig_sym_rrd<T>::run(matrix_type& X, real_vector_type& d,
         }
     }
 
-    return;
+    return nvec;
 }
 
 } // namespace: expsum

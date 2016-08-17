@@ -1,16 +1,12 @@
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 
 #include "expsum/approx_pow.hpp"
+#include "expsum/reduction.hpp"
 
-using size_type = arma::uword;
-using real_type = double;
+using size_type   = arma::uword;
+using real_type   = double;
 using real_vector = arma::Col<real_type>;
-
-// real_type eval_expsum(const real_vector& a, const real_vector& w, real_type x)
-// {
-//     return arma::sum(arma::exp(-x * a) % w);
-// }
 
 void run_approx_pow(real_type beta, real_type delta, real_type eps,
                     size_type n_samples = 1000)
@@ -37,6 +33,9 @@ void run_approx_pow(real_type beta, real_type delta, real_type eps,
                   << ' ' << std::setw(24) << rel_err // relative error
                   << '\n';
     }
+    std::cout << "\n\n# After reduction\n";
+    expsum::reduction_body<real_type> body;
+    body.run(ret.exponent(), ret.weight(), eps);
 }
 
 int main()

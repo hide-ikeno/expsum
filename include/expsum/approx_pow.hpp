@@ -130,7 +130,6 @@ exponential_sum<T, T> approx_pow(T beta, T delta, T eps)
         ret.weight(i)   = pre * std::exp(beta * (t_lower + h0 * i));
     }
 
-    ret.truncate(eps);
     // ret.remove_small_terms(eps / ret.size());
 
     return ret;
