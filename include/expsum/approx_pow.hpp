@@ -6,6 +6,7 @@
 
 #include <armadillo>
 
+#include "expsum/balanced_truncation.hpp"
 #include "expsum/exponential_sum.hpp"
 #include "expsum/gamma.hpp"
 
@@ -69,6 +70,7 @@ template <typename T>
 exponential_sum<T, T> approx_pow(T beta, T delta, T eps)
 {
     using size_type   = arma::uword;
+    using vector_type = arma::Col<T>;
     using result_type = exponential_sum<T, T>;
 
     assert(beta > T());
@@ -120,19 +122,35 @@ exponential_sum<T, T> approx_pow(T beta, T delta, T eps)
     //
     // Make sub-optimal approximation with exponential sum
     //
-    const auto n0 = static_cast<size_type>(std::ceil((t_upper - t_lower) / h0));
 
-    result_type ret(n0);
+    auto n0 = static_cast<size_type>(std::ceil((t_upper - t_lower) / h0));
+    auto n1 = static_cast<size_type>(std::floor(-t_lower / h0));
+    auto n2 = n0 - n1;
+
+    vector_type a(n0);             // exponents
+    vector_type w(n0);             // exponents
     const auto pre = h0 * scale_l; // h0 / tgamma(beta);
     for (size_type i = 0; i < n0; ++i)
     {
-        ret.exponent(i) = std::exp(t_lower + h0 * i);
-        ret.weight(i)   = pre * std::exp(beta * (t_lower + h0 * i));
+        a(i) = std::exp(t_lower + h0 * i);
+        w(i) = pre * std::exp(beta * (t_lower + h0 * i));
     }
 
-    // ret.remove_small_terms(eps / ret.size());
+    balanced_truncation<T> trunc;
 
-    return ret;
+    trunc.run(a.head(n1), w.head(n1), eps);
+    n1         = trunc.size();
+    a.head(n1) = trunc.exponents();
+    w.head(n1) = trunc.weights();
+
+    trunc.run(a.tail(n2), w.tail(n2), eps);
+    n2 = trunc.size();
+    a.subvec(n1, n1 + n2 - 1) = trunc.exponents();
+    w.subvec(n1, n1 + n2 - 1) = trunc.weights();
+
+    result_type ret2(a.head(n1 + n2), w.head(n1 + n2));
+
+    return ret2;
 }
 
 } // namespace: expsum

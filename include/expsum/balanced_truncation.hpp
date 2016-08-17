@@ -57,6 +57,11 @@ public:
         }
     }
 
+    size_type size() const
+    {
+        return size_;
+    }
+
     //
     // @return Vector view to the exponents.
     //
@@ -154,7 +159,7 @@ balanced_truncation<T>::run(const VecP& p, const VecW& w, real_type tol)
 
     assert(p.n_elem == w.n_elem);
 
-    const auto n = p.size();
+    const auto n = p.n_elem;
     resize(n);
     if (n <= size_type(1))
     {
@@ -208,13 +213,14 @@ balanced_truncation<T>::run(const VecP& p, const VecW& w, real_type tol)
     // Cholesky factorization can be computed accurately using the Gaussian
     // elimination with complete pivoting (GECP).
     //
-    size_ = cholesky_rrd::pivot_order(a, b, x, y, tol, ipiv_, work1);
+    index_vector_type ipiv(ipiv_.memptr(), n, false, true);
+    size_ = cholesky_rrd::pivot_order(a, b, x, y, tol, ipiv, work1);
 
     matrix_type X1(ptr_X, n, size_, false, true);
     real_vector_type d(ptr_d, size_, false, true);
 
     cholesky_rrd::factorize(a, b, x, y, X1, d, work1, work2);
-    cholesky_rrd::apply_row_permutation(X1, ipiv_, work1);
+    cholesky_rrd::apply_row_permutation(X1, ipiv, work1);
 
 #ifdef DEBUG
     std::cout << "*** coneig_sym_rrd:" << std::endl;
@@ -268,9 +274,7 @@ balanced_truncation<T>::run(const VecP& p, const VecW& w, real_type tol)
     matrix_type A1(ptr_a, size_, size_, false, true);
     vector_type p_(exponent_.memptr(), size_, false, true);
     vector_type w_(weight_.memptr(), size_, false, true);
-    std::cout << "==== A1" << std::endl;
     A1 = viewX.t() * arma::diagmat(p) * arma::conj(viewX);
-    std::cout << "==== w'" << std::endl;
     w_ = viewX.t() * arma::sqrt(w);
 
     matrix_type X2(ptr_X, size_, size_, false, true);
@@ -282,15 +286,27 @@ balanced_truncation<T>::run(const VecP& p, const VecW& w, real_type tol)
     diagonalize(A1, X2, p_, ptr_a + n * n, n * n, rwork_.memptr());
 
 #ifdef DEBUG
-    const auto resid1 = arma::norm(A1_orig * X2 - X2 * arma::diagmat(p_));
-    const auto resid2 =
-        arma::norm(X2.st() * A1_orig - arma::diagmat(p_) * X2.st());
+    // const auto resid1 = arma::norm(A1_orig * X2 - X2 * arma::diagmat(p_));
+    // const auto resid2 =
+    //     arma::norm(X2.st() * A1_orig - arma::diagmat(p_) * X2.st());
+    const auto norm_A1 = arma::norm(A1_orig);
+    const auto resid2  = arma::norm(A1_orig - X2 * arma::diagmat(p_) * X2.st());
+
     const auto resid_orth2 =
         arma::norm(arma::eye<matrix_type>(size_, size_) - X2.st() * X2);
-    std::cout << "    |A * X - X * D|           = " << resid1 << '\n'
-              << "    |X.st() * A - D * X.st()| = " << resid2 << '\n'
-              << "    |I - X.st() * X|          = " << resid_orth2 << std::endl;
+    // std::cout << "    |A * X - X * D|           = " << resid1 << '\n'
+    //           << "    |X.st() * A - D * X.st()| = " << resid2 << '\n'
+    //           << "    |I - X.st() * X|          = " << resid_orth2 <<
+    //           std::endl;
+    std::cout << "    |A - X * D * X.st()|       = " << resid2 << '\n'
+              << "    |A - X * D * X.st()| / |A| = " << resid2 / norm_A1 << '\n'
+              << "    |I - X.st() * X|           = " << resid_orth2
+              << std::endl;
 #endif /* DEBUG */
+
+    A1.col(0) = w_;
+    w_        = X2.st() * A1.col(0);
+    w_        = arma::square(w_);
 
     return;
 }

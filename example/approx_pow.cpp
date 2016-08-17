@@ -2,23 +2,18 @@
 #include <iostream>
 
 #include "expsum/approx_pow.hpp"
-#include "expsum/reduction.hpp"
+#include "expsum/balanced_truncation.hpp"
 
-using size_type   = arma::uword;
-using real_type   = double;
-using real_vector = arma::Col<real_type>;
+using size_type     = arma::uword;
+using real_type     = double;
+using real_vector   = arma::Col<real_type>;
+using function_type = expsum::exponential_sum<real_type, real_type>;
 
-void run_approx_pow(real_type beta, real_type delta, real_type eps,
-                    size_type n_samples = 1000)
+void print_result(real_type beta, const real_vector& grid,
+                  const function_type& ret)
 {
-    const auto ret = expsum::approx_pow(beta, delta, eps);
-    std::cout << "# Approximation of r^(" << beta << ") by exponential sum\n"
-              << "# no. of terms and (exponents, weights)\n"
-              << ret << '\n';
     // Sampling
     std::cout << "\n\n# r, exact, approx, abs. err., rel. err.\n";
-    auto grid =
-        arma::logspace<real_vector>(std::log10(delta) - 1, 1.0, n_samples);
     for (auto x : grid)
     {
         const auto approx  = ret(x);
@@ -33,9 +28,26 @@ void run_approx_pow(real_type beta, real_type delta, real_type eps,
                   << ' ' << std::setw(24) << rel_err // relative error
                   << '\n';
     }
-    std::cout << "\n\n# After reduction\n";
-    expsum::reduction_body<real_type> body;
-    body.run(ret.exponent(), ret.weight(), eps);
+}
+
+void run_approx_pow(real_type beta, real_type delta, real_type eps,
+                    size_type n_samples = 1000)
+{
+    const auto ret = expsum::approx_pow(beta, delta, eps);
+    std::cout << "# Approximation of r^(" << beta << ") by exponential sum\n"
+              << "# no. of terms and (exponents, weights)\n"
+              << ret << '\n';
+    const auto grid = arma::logspace<real_vector>(std::log10(delta) - 1,
+                                                  real_type(1), n_samples);
+
+    print_result(beta, grid, ret);
+
+    // std::cout << "\n\n# After reduction\n" << ret << '\n';
+    // expsum::balanced_truncation<real_type> truncation;
+    // truncation.run(ret.exponent(), ret.weight(), eps);
+
+    // function_type ret_trunc(truncation.exponents(), truncation.weights());
+    // print_result(beta, grid, ret_trunc);
 }
 
 int main()
