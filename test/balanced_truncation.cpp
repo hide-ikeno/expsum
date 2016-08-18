@@ -3,25 +3,56 @@
 #include <iostream>
 
 #include "expsum/balanced_truncation.hpp"
+#include "expsum/exponential_sum.hpp"
 
 using size_type = arma::uword;
 
 //
-// Test for coneig_quasi_cauchy
+// Test balanced truncation for exponential sum
 //
+
+template <typename T>
+void print_funcs(const expsum::exponential_sum<T, T>& orig,
+                 const expsum::exponential_sum<T, T>& truncated)
+{
+    using real_type = typename arma::get_pod_type<T>::result;
+    // using real_vector_type = arma::Col<real_type>;
+
+    const size_type n     = 5001;
+    const real_type delta = real_type(1) / (n - 1);
+    for (size_type i = 0; i < n; ++i)
+    {
+        const auto x      = delta * i;
+        const auto f1     = orig(x);
+        const auto f2     = truncated(x);
+        const auto abserr = std::abs(f1 - f2);
+        const auto relerr = (f1 != T()) ? abserr / std::abs(f1) : abserr;
+
+        std::cout << x << '\t' << f1 << '\t' << f2 << '\t' << abserr << '\t'
+                  << relerr << '\n';
+    }
+}
+
 template <typename T>
 void test_balanced_truncation(size_type n)
 {
     using real_type   = typename arma::get_pod_type<T>::result;
     using vector_type = arma::Col<T>;
+    using result_type = expsum::exponential_sum<T, T>;
 
     const auto delta = std::sqrt(n) * arma::Datum<real_type>::eps;
 
     vector_type a(n, arma::fill::randu);
     vector_type w(n, arma::fill::randu);
 
+    result_type orig(a, w);
+
     expsum::balanced_truncation<T> truncation;
     truncation.run(a, w, delta);
+
+    result_type truncated(truncation.exponents(), truncation.weights());
+
+    print_funcs(orig, truncated);
 }
 
 int main()
@@ -32,7 +63,7 @@ int main()
     arma::arma_rng::set_seed_random();
 
     const size_type n       = 200;
-    const size_type n_trial = 20;
+    const size_type n_trial = 5;
 
     std::cout << "# real quasi-cauchy matrix of dimension " << n << '\n';
 
