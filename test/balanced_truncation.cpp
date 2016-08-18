@@ -15,14 +15,17 @@ template <typename T>
 void print_funcs(const expsum::exponential_sum<T, T>& orig,
                  const expsum::exponential_sum<T, T>& truncated)
 {
-    using real_type = typename arma::get_pod_type<T>::result;
-    // using real_vector_type = arma::Col<real_type>;
+    using real_type        = typename arma::get_pod_type<T>::result;
+    using real_vector_type = arma::Col<real_type>;
 
-    const size_type n     = 5001;
-    const real_type delta = real_type(1) / (n - 1);
+    const size_type n = 5001;
+    const auto xmin   = real_type(-5);
+    const auto xmax   = real_type(1);
+    const auto grid   = arma::logspace<real_vector_type>(xmin, xmax, n);
+
     for (size_type i = 0; i < n; ++i)
     {
-        const auto x      = delta * i;
+        const auto x      = grid(i);
         const auto f1     = orig(x);
         const auto f2     = truncated(x);
         const auto abserr = std::abs(f1 - f2);
