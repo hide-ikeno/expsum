@@ -18,22 +18,30 @@ void print_funcs(const expsum::exponential_sum<T, T>& orig,
     using real_type        = typename arma::get_pod_type<T>::result;
     using real_vector_type = arma::Col<real_type>;
 
-    const size_type n = 5001;
-    const auto xmin   = real_type(-5);
-    const auto xmax   = real_type(1);
-    const auto grid   = arma::logspace<real_vector_type>(xmin, xmax, n);
+    const size_type n = 100001;
+    // const auto xmin   = real_type(-5);
+    // const auto xmax   = real_type(1);
+    // const auto grid   = arma::logspace<real_vector_type>(xmin, xmax, n);
+
+    const auto xmin = real_type();
+    const auto xmax = real_type(10);
+    const auto grid = arma::linspace<real_vector_type>(xmin, xmax, n);
+    real_vector_type abserr(n);
+    real_vector_type relerr(n);
 
     for (size_type i = 0; i < n; ++i)
     {
-        const auto x      = grid(i);
-        const auto f1     = orig(x);
-        const auto f2     = truncated(x);
-        const auto abserr = std::abs(f1 - f2);
-        const auto relerr = (f1 != T()) ? abserr / std::abs(f1) : abserr;
-
-        std::cout << x << '\t' << f1 << '\t' << f2 << '\t' << abserr << '\t'
-                  << relerr << '\n';
+        const auto x  = grid(i);
+        const auto f1 = orig(x);
+        const auto f2 = truncated(x);
+        abserr(i)     = std::abs(f1 - f2);
+        relerr(i)     = (f1 != T()) ? abserr(i) / std::abs(f1) : abserr(i);
     }
+
+    std::cout << "    size before truncation = " << orig.size() << '\n'
+              << "    size after truncation  = " << truncated.size() << '\n'
+              << "    max abs. error = " << arma::max(abserr) << '\n'
+              << "    max rel. error = " << arma::max(relerr) << std::endl;
 }
 
 template <typename T>

@@ -163,6 +163,7 @@ balanced_truncation<T>::run(const VecP& p, const VecW& w, real_type tol)
     resize(n);
     if (n <= size_type(1))
     {
+        // Quick return
         return;
     }
 
@@ -170,16 +171,16 @@ balanced_truncation<T>::run(const VecP& p, const VecW& w, real_type tol)
     value_type* ptr_a = ptr_X + n * n;
     real_type* ptr_d  = reinterpret_cast<real_type*>(exponent_.memptr());
 
-#ifdef DEBUG
-    matrix_type P(n, n);
-#endif /* DEBUG */
-
     //
     // Set the factors that defines the quasi-Cauchy matrix
     //
-    // P(i, j) = a(i) * b(j) /(x(i) + y(j))
+    //   P(i, j) = a[i] * b[j] /(x[i] + y[j]),
+    //   a[i] = sqrt(w[i]),
+    //   b[i] = sqrt(conj(p[i])),
+    //   x[i] = p[i],
+    //   y[i] = conj(p[i]),
     //
-    // This is the controllability Gramian matrix of the system.
+    // which is the controllability Gramian matrix of the system.
     //
     vector_type a(ptr_a + 0 * n, n, false, true);
     vector_type b(ptr_a + 1 * n, n, false, true);
@@ -192,18 +193,6 @@ balanced_truncation<T>::run(const VecP& p, const VecW& w, real_type tol)
     b = arma::conj(a);
     x = p;
     y = arma::conj(x);
-
-#ifdef DEBUG
-    for (size_type j = 0; j < n; ++j)
-    {
-        for (size_type i = 0; i < n; ++i)
-        {
-            P(i, j) = a(i) * b(j) / (x(i) + y(j));
-        }
-    }
-
-    std::cout << "*** cholesky_quasi_cauchy:" << std::endl;
-#endif /* DEBUG */
 
     //
     // Rank-revealing Cholesky factorization of Gramian matrix given as
@@ -222,25 +211,32 @@ balanced_truncation<T>::run(const VecP& p, const VecW& w, real_type tol)
     cholesky_rrd::factorize(a, b, x, y, X1, d, work1, work2);
     cholesky_rrd::apply_row_permutation(X1, ipiv, work1);
 
-#ifdef DEBUG
-    std::cout << "*** coneig_sym_rrd:" << std::endl;
-#endif /* DEBUG */
-
     //
     // Compute the state-space transformation matrix.
     //
     // First compute eigenvalue decomposition of L * Q * L.t(), where Q is
-    // observability Gramian matrix of the system,
-    // which can be obtained as Q = P.st()
+    // observability Gramian matrix of the system, which can be obtained as
+    // Q = P.st()
     //
-    // Let us define G = D * X.st() * X * D, then eigenvalue decomposition L * Q
-    // * L.t() = G.t() * G = X * S^2 * X.t(). As  described by Haut and Beylkin
-    // (2011), the eigenvectors of G.t() * G become con-eigenvectors of matrix
-    // P, i.e.,
+    // Let us define
     //
-    // P = conj(X) * S * X.t().
+    //   G = D * X.st() * X * D,
     //
-    // The matrix X is the desired transformation matrix of the system.
+    // then eigenvalue decomposition
+    //
+    //   L * Q * L.t() = G.t() * G = X * S^2 * X.t().
+    //
+    // As described by Haut and Beylkin (2011), the eigenvectors of G.t() * G
+    // become con-eigenvectors of matrix P, i.e.,
+    //
+    //   P = conj(X) * S * X.t().
+    //
+    // where the matrix X is (complex) orthogonal, X.t() * X = I
+    //
+    // The matrix conj(X) is the desired transformation matrix of the system.
+    //
+    // `coneig_sym_rrd` computes only the con-eigenvalues greater than the
+    // target accuracy `tol` and corresponding con-eigenvectors.
     //
     // NOTE: Required memory for workspace
     //
@@ -249,61 +245,45 @@ balanced_truncation<T>::run(const VecP& p, const VecW& w, real_type tol)
     //    if `T` is real type   : n
     //    if `T` is complex type: 3 * n
     //
-    size_ = coneig_sym_rrd<T>::run(X1, d, tol, ptr_a, rwork_.memptr());
-
-#ifdef DEBUG
-    std::cout << "*** found " << size_ << " con-eigenpairs" << std::endl;
-    auto Xv           = X1.head_cols(size_);
-    auto dv           = d.head(size_);
-    const auto norm_P = arma::norm(P);
-    const auto resid_norm =
-        arma::norm(P - arma::conj(Xv) * arma::diagmat(dv) * Xv.st());
-    const auto resid_orth =
-        arma::norm(arma::eye<matrix_type>(size_, size_) - Xv.st() * Xv);
-    std::cout << "    |P - conj(X) * D * X.st()|       = " << resid_norm << '\n'
-              << "    |P - conj(X) * D * X.st()| / |P| = "
-              << resid_norm / norm_P << '\n'
-              << "    |I - X.st() * X|                 = " << resid_orth
-              << '\n';
-#endif /* DEBUG */
-
+    const auto k = coneig_sym_rrd<T>::run(X1, d, tol, ptr_a, rwork_.memptr());
     //
     // Apply transformation matrix
     //
-    auto viewX = X1.head_cols(size_);
-    matrix_type A1(ptr_a, size_, size_, false, true);
-    vector_type p_(exponent_.memptr(), size_, false, true);
-    vector_type w_(weight_.memptr(), size_, false, true);
-    A1 = viewX.t() * arma::diagmat(p) * arma::conj(viewX);
-    w_ = viewX.t() * arma::sqrt(w);
+    // A1 = Xk.t() * diagmat(a) * conj(Xk)
+    // b1 = Xk.t() * b
+    // c1 = b.st() * conj(Xk) = b1.st()
+    //
+    // where Xk = X1.head_cols(k) that satisfies X_k.st() * X_k = I_k
+    //
+    auto Xk = X1.head_cols(k);
+    matrix_type A1(ptr_a, k, k, false, true);
+    vector_type p_(exponent_.memptr(), k, false, true);
+    vector_type w_(weight_.memptr(), k, false, true);
+    A1 = Xk.t() * arma::diagmat(p) * arma::conj(Xk);
+    w_ = Xk.t() * arma::sqrt(w);
 
-    matrix_type X2(ptr_X, size_, size_, false, true);
-#ifdef DEBUG
-    std::cout << "*** eigen-decomposition" << std::endl;
-    matrix_type A1_orig(A1);
-#endif
-
+    //
+    // Compute eigenvalue decomposition of the (k x k) matrix, A1. Since A1 is
+    // real/complex symmetric matrix, the eigen decomposition has the form
+    //
+    //   A1 = X2 * D * X2.st(), (X2.st() * X2 = I).
+    //
+    matrix_type X2(ptr_X, k, k, false, true);
     diagonalize(A1, X2, p_, ptr_a + n * n, n * n, rwork_.memptr());
 
-#ifdef DEBUG
-    // const auto resid1 = arma::norm(A1_orig * X2 - X2 * arma::diagmat(p_));
-    // const auto resid2 =
-    //     arma::norm(X2.st() * A1_orig - arma::diagmat(p_) * X2.st());
-    const auto norm_A1 = arma::norm(A1_orig);
-    const auto resid2  = arma::norm(A1_orig - X2 * arma::diagmat(p_) * X2.st());
-
-    const auto resid_orth2 =
-        arma::norm(arma::eye<matrix_type>(size_, size_) - X2.st() * X2);
-    // std::cout << "    |A * X - X * D|           = " << resid1 << '\n'
-    //           << "    |X.st() * A - D * X.st()| = " << resid2 << '\n'
-    //           << "    |I - X.st() * X|          = " << resid_orth2 <<
-    //           std::endl;
-    std::cout << "    |A - X * D * X.st()|       = " << resid2 << '\n'
-              << "    |A - X * D * X.st()| / |A| = " << resid2 / norm_A1 << '\n'
-              << "    |I - X.st() * X|           = " << resid_orth2
-              << std::endl;
-#endif /* DEBUG */
-
+    //
+    // Apply the state space transformation by X2,
+    //
+    // A2 = X2.st() * A1 * X2 = D
+    // b2 = X2.st() * b1
+    // c2 = b1 * X2 = b2.st()
+    //
+    // Finally parameters for truncated exponential sum can be obtained as
+    //
+    // p' = A2 = diag(D)
+    // w' = c2 % b2 = square(b2)
+    //
+    size_     = k;
     A1.col(0) = w_;
     w_        = X2.st() * A1.col(0);
     w_        = arma::square(w_);
