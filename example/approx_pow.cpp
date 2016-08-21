@@ -55,8 +55,8 @@ int main()
     std::cout.precision(15);
     std::cout.setf(std::ios::scientific);
 
-    const auto delta = 1.0e-9;
-    const auto eps   = 1.0e-10;
+    const auto delta = 1.0e-8;
+    const auto eps   = 1.0e-12;
 
     run_approx_pow(0.5, delta, eps);
 

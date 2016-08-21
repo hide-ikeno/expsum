@@ -19,9 +19,6 @@ void print_funcs(const expsum::exponential_sum<T, T>& orig,
     using real_vector_type = arma::Col<real_type>;
 
     const size_type n = 100001;
-    // const auto xmin   = real_type(-5);
-    // const auto xmax   = real_type(1);
-    // const auto grid   = arma::logspace<real_vector_type>(xmin, xmax, n);
 
     const auto xmin = real_type();
     const auto xmax = real_type(10);
@@ -39,9 +36,14 @@ void print_funcs(const expsum::exponential_sum<T, T>& orig,
     }
 
     std::cout << "    size before truncation = " << orig.size() << '\n'
-              << "    size after truncation  = " << truncated.size() << '\n'
-              << "    max abs. error = " << arma::max(abserr) << '\n'
-              << "    max rel. error = " << arma::max(relerr) << std::endl;
+              << "    size after truncation  = " << truncated.size() << '\n';
+    auto imax = abserr.index_max();
+    std::cout << "    max abs. error in [0, 10]: " << abserr(imax)
+              << " (rel. error: " << relerr(imax) << ")\n";
+
+    imax = relerr.index_max();
+    std::cout << "    max rel. error in [0, 10]: " << relerr(imax)
+              << " (abs. error: " << abserr(imax) << ")" << std::endl;
 }
 
 template <typename T>

@@ -15,6 +15,7 @@ namespace expsum
 
 namespace detail
 {
+
 template <typename T, typename UnaryFunction1, typename UnaryFunction2,
           typename UnaryFunction3>
 T newton_solve(T initial_guess, T tol, UnaryFunction1 transform,
@@ -42,6 +43,113 @@ T newton_solve(T initial_guess, T tol, UnaryFunction1 transform,
     }
 
     return t0;
+}
+
+//
+// Reduce terms of exponential sum by modified Prony method.
+// This method is for reducing terms with small exponent.
+//
+template <typename T>
+arma::uword modified_prony_reduction(arma::Col<T>& exponents,
+                                     arma::Col<T>& weights,
+                                     typename arma::get_pod_type<T>::result eps)
+{
+    using size_type    = arma::uword;
+    using real_type    = typename arma::get_pod_type<T>::result;
+    using complex_type = std::complex<real_type>;
+    using vector_type  = arma::Col<T>;
+    using matrix_type  = arma::Mat<T>;
+
+    using complex_vector_type = arma::Col<complex_type>;
+
+    vector_type h(2 * exponents.size());
+    vector_type a_pow(exponents);
+
+    h(0) = arma::sum(weights);
+    h(1) = -arma::sum(weights % a_pow);
+
+    size_type m         = 1;
+    real_type factorial = real_type(1);
+
+    for (; m < exponents.size(); ++m)
+    {
+        a_pow %= exponents;
+        h(2 * m) = arma::sum(weights % a_pow);
+        a_pow %= exponents;
+        h(2 * m + 1) = -arma::sum(weights % a_pow);
+        factorial *= real_type((2 * m) * (2 * m + 1));
+        if (std::abs(h(2 * m + 1)) < eps * factorial)
+        {
+            // Taylor expansion converges with the tolerance eps.
+            ++m;
+            break;
+        }
+    }
+
+    //
+    // Construct a Hankel matrix from the sequence h, and solve the linear
+    // equation, H q = b, with b = -h(m:2m-1).
+    //
+    matrix_type H(m, m);
+    for (size_type k = 0; k < m; ++k)
+    {
+        H.col(k) = h.subvec(k, k + m - 1);
+    }
+    vector_type b(-h.tail(m));
+    vector_type q(m);
+    arma::solve(q, H, b);
+    //
+    // Find the roots of the Prony polynomial,
+    //
+    // q(z) = \sum_{k=0}^{m-1} q_k z^{k}.
+    //
+    // The roots of q(z) can be obtained as the eigenvalues of the companion
+    // matrix,
+    //
+    //     (0  0  ...  0 -p[0]  )
+    //     (1  0  ...  0 -p[1]  )
+    // C = (0  1  ...  0 -p[2]  )
+    //     (.. .. ...  .. ..    )
+    //     (0  0  ...  1 -p[m-1])
+    //
+    matrix_type C(m, m, arma::fill::zeros);
+    for (size_type i = 0; i < m - 1; ++i)
+    {
+        C(i + 1, i) = real_type(1);
+    }
+    C.col(m - 1) = -q;
+
+    complex_vector_type eigvals(m);
+    arma::eig_gen(eigvals, C);
+
+    exponents.head(m) = arma::real(eigvals);
+    //
+    // Construct Vandermonde matrix from gamma
+    //
+    matrix_type V(2 * m, m);
+    for (size_type i = 0; i < m; ++i)
+    {
+        // We assume all the eigenvalues are real here
+        const auto z = exponents(i);
+        V(0, i) = real_type(1);
+        for (size_type j = 1; j < V.n_rows; ++j)
+        {
+            V(j, i) = V(j - 1, i) * z; // z[i]**j
+        }
+    }
+    //
+    // Solve overdetermined Vandermonde system,
+    //
+    // V(0:2m-1,0:m-1) w(0:m-1) = h(0:2m-1)
+    //
+    // by the least square method.
+    //
+    vector_type b2 = h.head(2 * m);
+
+    arma::solve(q, V, b2);
+    weights.head(m) = q;
+
+    return m;
 }
 
 } // namespace: detail
@@ -123,34 +231,30 @@ exponential_sum<T, T> approx_pow(T beta, T delta, T eps)
     // Make sub-optimal approximation with exponential sum
     //
 
-    auto n0 = static_cast<size_type>(std::ceil((t_upper - t_lower) / h0));
-    auto n1 = static_cast<size_type>(std::floor(-t_lower / h0));
-    auto n2 = n0 - n1;
-
-    vector_type a(n0);             // exponents
-    vector_type w(n0);             // exponents
+    const auto n0 = static_cast<size_type>(std::ceil((t_upper - t_lower) / h0));
     const auto pre = h0 * scale_l; // h0 / tgamma(beta);
+
+    vector_type a(n0);
+    vector_type w(n0);
     for (size_type i = 0; i < n0; ++i)
     {
         a(i) = std::exp(t_lower + h0 * i);
         w(i) = pre * std::exp(beta * (t_lower + h0 * i));
     }
 
-    balanced_truncation<T> trunc;
+    // reduce terms with exponents (0, 1);
+    size_type n1 = static_cast<size_type>(-std::floor(t_lower) / h0);
+    vector_type a1_(a.memptr(), n1, false, true);
+    vector_type w1_(w.memptr(), n1, false, true);
+    size_type m1 = detail::modified_prony_reduction(a1_, w1_, eps);
+    for (size_type i = n1; i < n0; ++i)
+    {
+        a(m1) = a(i);
+        w(m1) = w(i);
+        ++m1;
+    }
 
-    trunc.run(a.head(n1), w.head(n1), eps);
-    n1         = trunc.size();
-    a.head(n1) = trunc.exponents();
-    w.head(n1) = trunc.weights();
-
-    trunc.run(a.tail(n2), w.tail(n2), eps);
-    n2 = trunc.size();
-    a.subvec(n1, n1 + n2 - 1) = trunc.exponents();
-    w.subvec(n1, n1 + n2 - 1) = trunc.weights();
-
-    result_type ret2(a.head(n1 + n2), w.head(n1 + n2));
-
-    return ret2;
+    return result_type(a.head(m1), w.head(m1));
 }
 
 } // namespace: expsum
