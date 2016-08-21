@@ -3,7 +3,7 @@
 
 #include <type_traits>
 
-#include "expsum/fast_esprit.hpp"
+#include "expsum/fitting/fast_esprit.hpp"
 
 namespace expsum
 {

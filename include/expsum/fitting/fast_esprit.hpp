@@ -7,9 +7,9 @@
 
 #include "arma/lapack_extra.hpp"
 
-#include "expsum/hankel_matrix.hpp"
-#include "expsum/partial_lanczos_bidiagonalization.hpp"
-#include "expsum/vandermonde_matrix.hpp"
+#include "expsum/fitting/hankel_matrix.hpp"
+#include "expsum/fitting/partial_lanczos_bidiagonalization.hpp"
+#include "expsum/fitting/vandermonde_matrix.hpp"
 
 namespace expsum
 {

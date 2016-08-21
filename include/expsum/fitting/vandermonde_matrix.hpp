@@ -5,7 +5,7 @@
 
 #include <armadillo>
 
-#include "expsum/lsqr.hpp"
+#include "expsum/fitting/lsqr.hpp"
 #include "expsum/numeric.hpp"
 
 namespace expsum
