@@ -7,7 +7,7 @@
 #include <numeric>
 #include <random>
 
-#include "expsum/vandermonde_matrix.hpp"
+#include "expsum/fitting/vandermonde_matrix.hpp"
 
 using size_type      = arma::uword;
 using real_type      = double;

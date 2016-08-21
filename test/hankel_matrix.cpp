@@ -6,9 +6,9 @@
 #include <iostream>
 #include <numeric>
 
-#include "expsum/hankel_matrix.hpp"
+#include "expsum/fitting/hankel_matrix.hpp"
 
-using size_type     = arma::uword;
+using size_type      = arma::uword;
 using real_matrix    = arma::mat;
 using complex_matrix = arma::cx_mat;
 
