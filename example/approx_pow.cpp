@@ -33,7 +33,10 @@ void print_result(real_type beta, const real_vector& grid,
 void run_approx_pow(real_type beta, real_type delta, real_type eps,
                     size_type n_samples = 1000)
 {
-    const auto ret = expsum::approx_pow(beta, delta, eps);
+    expsum::pow_kernel<real_type> pow_kern;
+    pow_kern.compute(beta, delta, eps);
+
+    function_type ret(pow_kern.exponents(), pow_kern.weights());
     std::cout << "# Approximation of r^(" << beta << ") by exponential sum\n"
               << "# no. of terms and (exponents, weights)\n"
               << ret << '\n';
@@ -56,9 +59,9 @@ int main()
     std::cout.setf(std::ios::scientific);
 
     const auto delta = 1.0e-8;
-    const auto eps   = 1.0e-12;
+    const auto eps   = 1.0e-10;
 
-    run_approx_pow(0.5, delta, eps);
+    run_approx_pow(1.0, delta, eps);
 
     return 0;
 }

@@ -2,6 +2,8 @@
 #define EXPSUM_APPROX_POW_HPP
 
 #include <cassert>
+#include <sstream>
+#include <stdexcept>
 #include <tuple>
 
 #include <armadillo>
@@ -9,6 +11,7 @@
 #include "expsum/balanced_truncation.hpp"
 #include "expsum/exponential_sum.hpp"
 #include "expsum/gamma.hpp"
+#include "expsum/modified_prony_truncation.hpp"
 
 namespace expsum
 {
@@ -45,113 +48,6 @@ T newton_solve(T initial_guess, T tol, UnaryFunction1 transform,
     return t0;
 }
 
-//
-// Reduce terms of exponential sum by modified Prony method.
-// This method is for reducing terms with small exponent.
-//
-template <typename T>
-arma::uword modified_prony_reduction(arma::Col<T>& exponents,
-                                     arma::Col<T>& weights,
-                                     typename arma::get_pod_type<T>::result eps)
-{
-    using size_type    = arma::uword;
-    using real_type    = typename arma::get_pod_type<T>::result;
-    using complex_type = std::complex<real_type>;
-    using vector_type  = arma::Col<T>;
-    using matrix_type  = arma::Mat<T>;
-
-    using complex_vector_type = arma::Col<complex_type>;
-
-    vector_type h(2 * exponents.size());
-    vector_type a_pow(exponents);
-
-    h(0) = arma::sum(weights);
-    h(1) = -arma::sum(weights % a_pow);
-
-    size_type m         = 1;
-    real_type factorial = real_type(1);
-
-    for (; m < exponents.size(); ++m)
-    {
-        a_pow %= exponents;
-        h(2 * m) = arma::sum(weights % a_pow);
-        a_pow %= exponents;
-        h(2 * m + 1) = -arma::sum(weights % a_pow);
-        factorial *= real_type((2 * m) * (2 * m + 1));
-        if (std::abs(h(2 * m + 1)) < eps * factorial)
-        {
-            // Taylor expansion converges with the tolerance eps.
-            ++m;
-            break;
-        }
-    }
-
-    //
-    // Construct a Hankel matrix from the sequence h, and solve the linear
-    // equation, H q = b, with b = -h(m:2m-1).
-    //
-    matrix_type H(m, m);
-    for (size_type k = 0; k < m; ++k)
-    {
-        H.col(k) = h.subvec(k, k + m - 1);
-    }
-    vector_type b(-h.tail(m));
-    vector_type q(m);
-    arma::solve(q, H, b);
-    //
-    // Find the roots of the Prony polynomial,
-    //
-    // q(z) = \sum_{k=0}^{m-1} q_k z^{k}.
-    //
-    // The roots of q(z) can be obtained as the eigenvalues of the companion
-    // matrix,
-    //
-    //     (0  0  ...  0 -p[0]  )
-    //     (1  0  ...  0 -p[1]  )
-    // C = (0  1  ...  0 -p[2]  )
-    //     (.. .. ...  .. ..    )
-    //     (0  0  ...  1 -p[m-1])
-    //
-    matrix_type C(m, m, arma::fill::zeros);
-    for (size_type i = 0; i < m - 1; ++i)
-    {
-        C(i + 1, i) = real_type(1);
-    }
-    C.col(m - 1) = -q;
-
-    complex_vector_type eigvals(m);
-    arma::eig_gen(eigvals, C);
-
-    exponents.head(m) = arma::real(eigvals);
-    //
-    // Construct Vandermonde matrix from gamma
-    //
-    matrix_type V(2 * m, m);
-    for (size_type i = 0; i < m; ++i)
-    {
-        // We assume all the eigenvalues are real here
-        const auto z = exponents(i);
-        V(0, i) = real_type(1);
-        for (size_type j = 1; j < V.n_rows; ++j)
-        {
-            V(j, i) = V(j - 1, i) * z; // z[i]**j
-        }
-    }
-    //
-    // Solve overdetermined Vandermonde system,
-    //
-    // V(0:2m-1,0:m-1) w(0:m-1) = h(0:2m-1)
-    //
-    // by the least square method.
-    //
-    vector_type b2 = h.head(2 * m);
-
-    arma::solve(q, V, b2);
-    weights.head(m) = q;
-
-    return m;
-}
-
 } // namespace: detail
 
 //
@@ -174,88 +70,332 @@ arma::uword modified_prony_reduction(arma::Col<T>& exponents,
 // @eps    required accuracy ``$0 < \epsilon < e^{-1}$``
 // @return pair of vectors holding expnents ``$a_{m}$`` and weights ``$w_{m}$``
 //
+
 template <typename T>
-exponential_sum<T, T> approx_pow(T beta, T delta, T eps)
+struct pow_kernel
 {
+public:
     using size_type   = arma::uword;
+    using real_type   = T;
     using vector_type = arma::Col<T>;
-    using result_type = exponential_sum<T, T>;
+    using matrix_type = arma::Mat<T>;
 
-    assert(beta > T());
-    assert(T() < delta && delta < T(1));
-    assert(T() < eps && eps < std::exp(T(-1)));
+private:
+    vector_type exponent_;
+    vector_type weight_;
+    real_type beta_;
+    real_type delta_;
+    real_type eps_;
 
-    const T log_beta  = std::log(beta);
-    const T log_delta = std::log(delta);
-    const T log_eps   = std::log(eps);
+public:
+    void compute(real_type beta__, real_type delta__, real_type eps__);
+
+    size_type size() const
+    {
+        return exponent_.size();
+    }
+
+    const vector_type& exponents() const
+    {
+        return exponent_;
+    }
+
+    const vector_type& weights() const
+    {
+        return weight_;
+    }
+
+    real_type beta() const
+    {
+        return beta_;
+    }
+
+    real_type delta() const
+    {
+        return delta_;
+    }
+
+    real_type eps() const
+    {
+        return eps_;
+    }
+
+private:
+    static real_type eval_at(real_type x, const vector_type& p,
+                             const vector_type& w)
+    {
+        return arma::sum(w % arma::exp(-x * p));
+    }
+
+    void optimal_discritization(real_type t_lower, real_type t_upper,
+                                real_type spacing);
+};
+
+template <typename T>
+void pow_kernel<T>::compute(real_type beta__, real_type delta__,
+                            real_type eps__)
+{
+    if (!(beta__ > real_type()))
+    {
+        std::ostringstream msg;
+        msg << "Invalid value for the argument `beta': "
+               "beta > 0 expected, but beta = "
+            << beta__ << " is given";
+        throw std::invalid_argument(msg.str());
+    }
+
+    if (!(real_type() < delta__ && delta__ < real_type(1)))
+    {
+        std::ostringstream msg;
+        msg << "Invalid value for the argument `delta': "
+               "0 < delta < 1 expected, but delta = "
+            << delta__ << " is given";
+        throw std::invalid_argument(msg.str());
+    }
+
+    if (!(real_type() < eps__ &&
+          eps__ < real_type(1) / arma::Datum<real_type>::e))
+    {
+        std::ostringstream msg;
+        msg << "Invalid value for the argument `eps': "
+               "0 < eps < 1/e expected, but "
+            << eps__ << " is given";
+        throw std::invalid_argument(msg.str());
+    }
+
+    beta_  = beta__;
+    delta_ = delta__;
+    eps_   = eps__;
+
+    const auto log_beta  = std::log(beta_);
+    const auto log_delta = std::log(delta_);
+    const auto log_eps   = std::log(eps_);
     //
     // Parameters required for obtaining sub-optimal expansion
     //
-    const T newton_tol = eps;
-    const T scale_l    = T(1) / std::tgamma(beta);
+    const auto newton_tol = eps_;
+    const auto scale_l    = T(1) / std::tgamma(beta_);
     // Eq. (31) of [Beylkin2010]
     auto t_lower = detail::newton_solve(
         // Initial guess --- Eq. (33) of [Beylkin2010]
-        (log_eps + std::lgamma(T(1) + beta)) / beta,
+        (log_eps + std::lgamma(T(1) + beta_)) / beta_,
         // Tolerance
         newton_tol,
         // transformation: x = exp(t)
         [=](T t) { return std::exp(t); },
         // f(x)  = gamma_p(x) - eps (with x = exp(t / 2))
-        [=](T x) { return gamma_p(beta, x) - eps; },
+        [=](T x) { return gamma_p(beta_, x) - eps_; },
         // f'(x) * dx/dt = exp(-x) * pow(x, beta-1)  / tgamma(beta) * x
-        [=](T x) { return std::exp(beta * std::log(x) - x) * scale_l; });
-
-    // std::cout << "# t_lower = "   << t_lower << std::endl;
+        [=](T x) { return std::exp(beta_ * std::log(x) - x) * scale_l; });
 
     // Eq. (32) of [Beylkin2010]
-    const auto scale_u = scale_l / delta;
+    const auto scale_u = scale_l / delta_;
     auto t_upper       = detail::newton_solve(
         // Initial guess --- Eq. (34) of [Beylkin2010]
         std::log(-log_eps) - log_delta + log_beta + T(0.5),
         // Tolerance
         newton_tol,
         // x = delta * exp(t/2)
-        [=](T t) { return delta * std::exp(t); },
+        [=](T t) { return delta_ * std::exp(t); },
         // f(x)
-        [=](T x) { return eps - gamma_q(beta, x); },
+        [=](T x) { return eps_ - gamma_q(beta_, x); },
         // f'(x) = df /dx * dx / dt
-        [=](T x) { return std::exp(beta * std::log(x) - x) * scale_u; });
-
-    // std::cout << "# t_upper = " << t_upper << std::endl;
+        [=](T x) { return std::exp(beta_ * std::log(x) - x) * scale_u; });
 
     // ----- Spacing of discritization (eq. (15) of [Beylkin2010])
-    const T q = std::log(T(3)) - beta * std::log(std::cos(T(1)));
-    auto h0   = T(2) * arma::Datum<T>::pi / (q - log_eps);
-    //
-    // Make sub-optimal approximation with exponential sum
-    //
+    const auto q = std::log(T(3)) - beta_ * std::log(std::cos(T(1)));
+    auto h0      = T(2) * arma::Datum<T>::pi / (q - log_eps);
 
-    const auto n0 = static_cast<size_type>(std::ceil((t_upper - t_lower) / h0));
-    const auto pre = h0 * scale_l; // h0 / tgamma(beta);
+    // Discritization of integral representation of power function
+    optimal_discritization(t_lower, t_upper, h0);
 
-    vector_type a(n0);
-    vector_type w(n0);
-    for (size_type i = 0; i < n0; ++i)
+    // Truncation of terms with small exponents
+    size_type m1 = 0;
+    for (; m1 < exponent_.size(); ++m1)
     {
-        a(i) = std::exp(t_lower + h0 * i);
-        w(i) = pre * std::exp(beta * (t_lower + h0 * i));
+        if (exponent_(m1) >= real_type(1))
+        {
+            break;
+        }
     }
+    size_type m2 = exponent_.size() - m1;
 
-    // reduce terms with exponents (0, 1);
-    size_type n1 = static_cast<size_type>(-std::floor(t_lower) / h0);
-    vector_type a1_(a.memptr(), n1, false, true);
-    vector_type w1_(w.memptr(), n1, false, true);
-    size_type m1 = detail::modified_prony_reduction(a1_, w1_, eps);
-    for (size_type i = n1; i < n0; ++i)
-    {
-        a(m1) = a(i);
-        w(m1) = w(i);
-        ++m1;
-    }
+    modified_prony_truncation<T> trunc1;
+    trunc1.run(exponent_.head(m1), weight_.head(m1), arma::Datum<T>::eps);
 
-    return result_type(a.head(m1), w.head(m1));
+    balanced_truncation<T> trunc2;
+    trunc2.run(exponent_.tail(m2), weight_.tail(m2), eps_);
+
+    vector_type p(trunc1.size() + trunc2.size());
+    vector_type w(trunc1.size() + trunc2.size());
+
+    p.head(trunc1.size()) = arma::real(trunc1.exponents());
+    w.head(trunc1.size()) = arma::real(trunc1.weights());
+    p.tail(trunc2.size()) = trunc2.exponents();
+    w.tail(trunc2.size()) = trunc2.weights();
+
+    exponent_.swap(p);
+    weight_.swap(w);
+
+    return;
 }
+
+template <typename T>
+void pow_kernel<T>::optimal_discritization(real_type t_lower, real_type t_upper,
+                                           real_type spacing)
+{
+    //
+    // Halves delta (twice t_lower) to avoid the large error near delta. Scaling
+    // factor is chosen empirically.
+    //
+    t_lower *= real_type(2);
+    // ----- Upper bound of the number of terms
+    const auto n0 =
+        static_cast<size_type>(std::ceil((t_upper - t_lower) / spacing));
+    //
+    // Make log-space sampling points in [delta, 1]
+    //
+    const size_type nsamples = 1001;
+    vector_type r(
+        arma::logspace<vector_type>(std::log10(delta_), real_type(), nsamples));
+
+    size_type n1 = 0;
+    size_type n2 = n0;
+
+    const auto scale = T(1) / std::tgamma(beta_);
+    while (true)
+    {
+        const auto n = (n1 + n2) / 2;
+        vector_type p(n);
+        vector_type w(n);
+
+        const auto h   = (t_upper - t_lower) / real_type(n - 1);
+        const auto pre = h * scale;
+
+        for (size_type i = 0; i < n; ++i)
+        {
+            p(i) = std::exp(t_lower + h * i);
+            w(i) = pre * std::exp(beta_ * (t_lower + h * i));
+        }
+
+        bool smaller_than_thresh = true;
+        for (size_type i = 0; i < r.size(); ++i)
+        {
+            const auto val = std::pow(r(i), beta_) * eval_at(r(i), p, w);
+            if (std::abs(real_type(1) - val) > eps_)
+            {
+                smaller_than_thresh = false;
+                break;
+            }
+        }
+
+        if (smaller_than_thresh)
+        {
+            exponent_.swap(p);
+            weight_.swap(w);
+            if (n2 <= n1 + 1)
+            {
+                break;
+            }
+            n2 = n;
+        }
+        else
+        {
+            n1 = (n2 == n1 + 1) ? n1 + 1 : n;
+        }
+    }
+
+    return;
+}
+
+// template <typename T>
+// exponential_sum<T, T> approx_pow(T beta, T delta, T eps)
+// {
+//     using size_type   = arma::uword;
+//     using vector_type = arma::Col<T>;
+//     using result_type = exponential_sum<T, T>;
+
+//     assert(beta > T());
+//     assert(T() < delta && delta < T(1));
+//     assert(T() < eps && eps < std::exp(T(-1)));
+
+//     const T log_beta  = std::log(beta);
+//     const T log_delta = std::log(delta);
+//     const T log_eps   = std::log(eps);
+//     //
+//     // Parameters required for obtaining sub-optimal expansion
+//     //
+//     const T newton_tol = eps;
+//     const T scale_l    = T(1) / std::tgamma(beta);
+//     // Eq. (31) of [Beylkin2010]
+//     auto t_lower = detail::newton_solve(
+//         // Initial guess --- Eq. (33) of [Beylkin2010]
+//         (log_eps + std::lgamma(T(1) + beta)) / beta,
+//         // Tolerance
+//         newton_tol,
+//         // transformation: x = exp(t)
+//         [=](T t) { return std::exp(t); },
+//         // f(x)  = gamma_p(x) - eps (with x = exp(t / 2))
+//         [=](T x) { return gamma_p(beta, x) - eps; },
+//         // f'(x) * dx/dt = exp(-x) * pow(x, beta-1)  / tgamma(beta) * x
+//         [=](T x) { return std::exp(beta * std::log(x) - x) * scale_l; });
+
+//     // std::cout << "# t_lower = "   << t_lower << std::endl;
+
+//     // Eq. (32) of [Beylkin2010]
+//     const auto scale_u = scale_l / delta;
+//     auto t_upper       = detail::newton_solve(
+//         // Initial guess --- Eq. (34) of [Beylkin2010]
+//         std::log(-log_eps) - log_delta + log_beta + T(0.5),
+//         // Tolerance
+//         newton_tol,
+//         // x = delta * exp(t/2)
+//         [=](T t) { return delta * std::exp(t); },
+//         // f(x)
+//         [=](T x) { return eps - gamma_q(beta, x); },
+//         // f'(x) = df /dx * dx / dt
+//         [=](T x) { return std::exp(beta * std::log(x) - x) * scale_u; });
+
+//     // std::cout << "# t_upper = " << t_upper << std::endl;
+
+//     // ----- Spacing of discritization (eq. (15) of [Beylkin2010])
+//     const T q = std::log(T(3)) - beta * std::log(std::cos(T(1)));
+//     auto h0   = T(2) * arma::Datum<T>::pi / (q - log_eps);
+//     //
+//     // Make sub-optimal approximation with exponential sum
+//     //
+
+//     const auto n0 = static_cast<size_type>(std::ceil((t_upper - t_lower) /
+//     h0));
+//     const auto pre = h0 * scale_l; // h0 / tgamma(beta);
+
+//     vector_type a(n0);
+//     vector_type w(n0);
+//     for (size_type i = 0; i < n0; ++i)
+//     {
+//         a(i) = std::exp(t_lower + h0 * i);
+//         w(i) = pre * std::exp(beta * (t_lower + h0 * i));
+//     }
+
+//     // reduce terms with exponents (0, 1);
+//     size_type n1 = static_cast<size_type>(-std::floor(t_lower) / h0);
+//     size_type n2 = n0 - n1;
+//     vector_type a1_(a.memptr(), n1, false, true);
+//     vector_type w1_(w.memptr(), n1, false, true);
+
+//     modified_prony_truncation<T> truncation1;
+//     std::cout << "*** truncation 1" << std::endl;
+//     truncation1.run(a1_, w1_, eps);
+//     std::cout << "*** done" << std::endl;
+//     const size_type m1 = truncation1.size();
+//     a.head(m1)         = arma::real(truncation1.exponents());
+//     w.head(m1)         = arma::real(truncation1.weights());
+
+//     a.subvec(m1, m1 + n2 - 1) = a.subvec(n1, n0 - 1);
+//     w.subvec(m1, m1 + n2 - 1) = w.subvec(n1, n0 - 1);
+
+//     return result_type(a.head(m1 + n2), w.head(m1 + n2));
+// }
 
 } // namespace: expsum
 
