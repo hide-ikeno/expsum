@@ -36,14 +36,14 @@ void run_approx_pow(real_type beta, real_type delta, real_type eps,
     expsum::pow_kernel<real_type> pow_kern;
     pow_kern.compute(beta, delta, eps);
 
-    function_type ret(pow_kern.exponents(), pow_kern.weights());
-    std::cout << "# Approximation of r^(" << beta << ") by exponential sum\n"
-              << "# no. of terms and (exponents, weights)\n"
-              << ret << '\n';
-    const auto grid = arma::logspace<real_vector>(std::log10(delta) - 1,
-                                                  real_type(1), n_samples);
+    // function_type ret(pow_kern.exponents(), pow_kern.weights());
+    // std::cout << "# Approximation of r^(" << beta << ") by exponential sum\n"
+    //           << "# no. of terms and (exponents, weights)\n"
+    //           << ret << '\n';
+    // const auto grid = arma::logspace<real_vector>(std::log10(delta) - 1,
+    //                                               real_type(1), n_samples);
 
-    print_result(beta, grid, ret);
+    // print_result(beta, grid, ret);
 
     // std::cout << "\n\n# After reduction\n" << ret << '\n';
     // expsum::balanced_truncation<real_type> truncation;
@@ -58,8 +58,8 @@ int main()
     std::cout.precision(15);
     std::cout.setf(std::ios::scientific);
 
-    const auto delta = 1.0e-8;
-    const auto eps   = 1.0e-10;
+    const auto delta = 1.0e-10;
+    const auto eps   = 1.0e-12;
 
     run_approx_pow(1.0, delta, eps);
 
