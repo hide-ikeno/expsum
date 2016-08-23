@@ -9,3 +9,5 @@ add_test_numeric(jacobi_svd)
 add_test_numeric(vandermonde_matrix)
 add_test_numeric(balanced_truncation)
 
+
+add_executable(test_gauss_quadrature gauss_quadrature.cpp)
