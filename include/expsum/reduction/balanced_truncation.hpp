@@ -1,12 +1,12 @@
-#ifndef EXPSUM_BALANCED_TRUNCATION_HPP
-#define EXPSUM_BALANCED_TRUNCATION_HPP
+#ifndef EXPSUM_REDUCTION_BALANCED_TRUNCATION_HPP
+#define EXPSUM_REDUCTION_BALANCED_TRUNCATION_HPP
 
 #include <cassert>
 
 #include <armadillo>
 
-#include "expsum/cholesky_quasi_cauchy.hpp"
-#include "expsum/coneig_sym_rrd.hpp"
+#include "expsum/reduction/cholesky_quasi_cauchy.hpp"
+#include "expsum/reduction/coneig_sym_rrd.hpp"
 
 namespace expsum
 {
@@ -293,4 +293,4 @@ balanced_truncation<T>::run(const VecP& p, const VecW& w, real_type tol)
 
 } // namespace: expsum
 
-#endif /* EXPSUM_BALANCED_TRUNCATION_HPP */
+#endif /* EXPSUM_REDUCTION_BALANCED_TRUNCATION_HPP */

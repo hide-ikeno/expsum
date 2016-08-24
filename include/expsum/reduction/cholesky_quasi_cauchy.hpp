@@ -1,5 +1,5 @@
-#ifndef EXPSUM_CHOLESKY_CAUCHY_HPP
-#define EXPSUM_CHOLESKY_CAUCHY_HPP
+#ifndef EXPSUM_REDUCTION_CHOLESKY_CAUCHY_HPP
+#define EXPSUM_REDUCTION_CHOLESKY_CAUCHY_HPP
 
 #include <armadillo>
 #include <cassert>
@@ -232,4 +232,4 @@ void cholesky_quasi_cauchy<T>::factorize(const vector_type& a,
 
 } // namespace: expsum
 
-#endif /* EXPSUM_CHOLESKY_CAUCHY_HPP */
+#endif /* EXPSUM_REDUCTION_CHOLESKY_CAUCHY_HPP */

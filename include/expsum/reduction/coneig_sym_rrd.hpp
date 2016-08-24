@@ -1,5 +1,5 @@
-#ifndef EXPSUM_CONEIG_SYM_RRD_HPP
-#define EXPSUM_CONEIG_SYM_RRD_HPP
+#ifndef EXPSUM_REDUCTION_CONEIG_SYM_RRD_HPP
+#define EXPSUM_REDUCTION_CONEIG_SYM_RRD_HPP
 
 #include <cassert>
 
@@ -319,4 +319,4 @@ coneig_sym_rrd<T>::run(matrix_type& X, real_vector_type& d, real_type threshold,
 
 } // namespace: expsum
 
-#endif /* EXPSUM_CONEIG_SYM_RRD_HPP */
+#endif /* EXPSUM_REDUCTION_CONEIG_SYM_RRD_HPP */
