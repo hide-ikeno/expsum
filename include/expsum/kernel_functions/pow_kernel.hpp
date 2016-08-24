@@ -1,5 +1,5 @@
-#ifndef EXPSUM_APPROX_POW_HPP
-#define EXPSUM_APPROX_POW_HPP
+#ifndef EXPSUM_KERNEL_FUNCTIONS_POW_KERNEL_HPP
+#define EXPSUM_KERNEL_FUNCTIONS_POW_KERNEL_HPP
 
 #include <cassert>
 #include <sstream>
@@ -17,40 +17,6 @@
 
 namespace expsum
 {
-
-namespace detail
-{
-
-template <typename T, typename UnaryFunction1, typename UnaryFunction2,
-          typename UnaryFunction3>
-T newton_solve(T initial_guess, T tol, UnaryFunction1 transform,
-               UnaryFunction2 f, UnaryFunction3 df)
-{
-    // Max iterations in the Newton method
-    constexpr const std::size_t max_iter = 10000;
-
-    std::size_t counter = max_iter;
-    auto t0             = initial_guess;
-
-    while (--counter > 0)
-    {
-        // Transformation of an argument
-        const auto x  = transform(t0);
-        const auto fx = f(x);
-        // We assume df(x) never to be too small.
-        const auto dfx = df(x);
-        const auto t1  = t0 - fx / dfx;
-        if (std::abs(t1 - t0) < std::abs(t1) * tol)
-        {
-            break;
-        }
-        t0 = t1;
-    }
-
-    return t0;
-}
-
-} // namespace: detail
 
 //
 // Approximate power function by an exponential sum.
@@ -474,4 +440,4 @@ pow_kernel<T>::get_num_gauss_legendre(real_type beta__, real_type eps__)
 }
 } // namespace: expsum
 
-#endif /* EXPSUM_APPROX_POW_HPP */
+#endif /* EXPSUM_KERNEL_FUNCTIONS_POW_KERNEL_HPP */

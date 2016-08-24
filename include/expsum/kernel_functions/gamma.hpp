@@ -24,8 +24,8 @@
  * THE SOFTWARE.
  */
 
-#ifndef EXPSUM_GAMMA_HPP
-#define EXPSUM_GAMMA_HPP
+#ifndef EXPSUM_KERNEL_FUNCTIONS_GAMMA_HPP
+#define EXPSUM_KERNEL_FUNCTIONS_GAMMA_HPP
 
 #include <cmath>
 #include <limits>
@@ -189,4 +189,4 @@ T gamma_q(T a, T x)
 
 } // namespace: expsum
 
-#endif /* EXPSUM_GAMMA_HPP */
+#endif /* EXPSUM_KERNEL_FUNCTIONS_GAMMA_HPP */

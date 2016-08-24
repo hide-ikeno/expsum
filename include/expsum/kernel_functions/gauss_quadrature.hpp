@@ -1,5 +1,5 @@
-#ifndef EXPSUM_GAUSS_QUADRATURE_HPP
-#define EXPSUM_GAUSS_QUADRATURE_HPP
+#ifndef EXPSUM_KERNEL_FUNCTIONS_GAUSS_QUADRATURE_HPP
+#define EXPSUM_KERNEL_FUNCTIONS_GAUSS_QUADRATURE_HPP
 
 #include <cassert>
 #include <cmath>
@@ -38,7 +38,7 @@ public:
     quadrature_rule& operator=(quadrature_rule&&) = default;
 
     //
-    // Construst `n`-points Gauss-Legendre rule
+    // Construst `n`-points quadrature rule
     //
     // @n number of integration points
     //
@@ -448,4 +448,4 @@ using gauss_jacobi_rule = quadrature_rule<T, gen_gauss_jacobi<T>>;
 
 } // namespace: expsum
 
-#endif /* EXPSUM_GAUSS_QUADRATURE_HPP */
+#endif /* EXPSUM_KERNEL_FUNCTIONS_GAUSS_QUADRATURE_HPP */
