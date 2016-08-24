@@ -320,6 +320,8 @@ struct gen_gauss_jacobi
 
     static void run(container_type& node, container_type& weight, T a, T b)
     {
+        assert(a > T(-1) && b > T(-1));
+
         const size_type n = node.size(); // number of nodes
 
         if (n == 0)
@@ -348,7 +350,6 @@ struct gen_gauss_jacobi
         //
         // Compute nodes on x > 0 and corresponding weights
         //
-        const size_type mid2 = (n + 1) / 2;
         for (size_type i = mid1; i < n; ++i)
         {
             std::tie(node[i], weight[i]) = root_and_weight(n, n - i, a, b);
