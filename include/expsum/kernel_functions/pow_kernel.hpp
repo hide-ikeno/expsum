@@ -89,12 +89,8 @@ public:
     }
 
 private:
-    static real_type eval_at(real_type x, const vector_type& p,
-                             const vector_type& w)
-    {
-        return arma::sum(w % arma::exp(-x * p));
-    }
-
+    static void check_params(real_type beta__, real_type delta__,
+                             real_type eps__);
     static size_type get_num_intervals(real_type beta__, real_type delta__,
                                        real_type eps__);
     static std::tuple<size_type, real_type>
@@ -107,49 +103,47 @@ template <typename T>
 void pow_kernel<T>::compute(real_type beta__, real_type delta__,
                             real_type eps__)
 {
-    if (!(beta__ > real_type()))
-    {
-        std::ostringstream msg;
-        msg << "Invalid value for the argument `beta': "
-               "beta > 0 expected, but beta = "
-            << beta__ << " is given";
-        throw std::invalid_argument(msg.str());
-    }
-
-    if (!(real_type() < delta__ && delta__ < real_type(1)))
-    {
-        std::ostringstream msg;
-        msg << "Invalid value for the argument `delta': "
-               "0 < delta < 1 expected, but delta = "
-            << delta__ << " is given";
-        throw std::invalid_argument(msg.str());
-    }
-
-    if (!(real_type() < eps__ &&
-          eps__ < real_type(1) / arma::Datum<real_type>::e))
-    {
-        std::ostringstream msg;
-        msg << "Invalid value for the argument `eps': "
-               "0 < eps < 1/e expected, but "
-            << eps__ << " is given";
-        throw std::invalid_argument(msg.str());
-    }
+    check_params(beta__, delta__, eps__);
 
     beta_  = beta__;
     delta_ = delta__;
     eps_   = eps__;
 
+    //
+    // Find the sub-optimal sum-of-exponential approximation by discretizing the
+    // integral representation of power function
+    //
+    // ``` math
+    //  r^{-\beta} = \frac{1}{\Gamma(\beta)}
+    //               \int_{0}^{\infty} e^{-rx} x^{\beta-1} dx \quad (t > 0).
+    // ```
+    //
+    // Split the integral into $J+1$ sub-intervals as
+    //
+    // ``` math
+    //  r^{-\beta}
+    //     = \frac{1}{\Gamma(\beta)}
+    //       \left( \int_{0}^{2} + \int_{4}^{2} + \int_{8}^{4} + \cdots
+    //             + \int_{2^{J-1}}^{2^J} + \int_{2^J}^{\infty} \right)
+    //       e^{-ry} x^{\beta-1} dy.
+    // ```
+    //
+    // The integral over the first interval $[0,2]$ is approximated by the $N_1$
+    // point Gauss-Jacobi rule, while the integral over the inteval
+    // $[2^{j-1},2^j]$ is approximated by the $N_2$ point Gauss-Legendre rule.
+    //
+    // The number of intervals $J$ and quadrature points $N_1,N_2$ are
+    // determined so as to the relative error of the truncation becomes smaller
+    // than $\epsilon$.
+    //
     size_type J, N1, N2;
     T b1, b2;
     J = get_num_intervals(beta__, delta__ / 2, eps__);
     std::tie(N1, b1) = get_num_gauss_jacobi(beta__, eps__ / (J + 1));
     std::tie(N2, b2) = get_num_gauss_legendre(beta__, eps__ / (J + 1));
-
-    // std::cout << "J = " << J << ", N1 = " << N1 << " (b1 = " << b1 << ")"
-    //           << ", N2 = " << N2 << " (b2 =" << b2 << ")" << std::endl;
-
     //
-    // Discritization of the integral representation of power function
+    // Discritization of the integral representation by applying the quadrature
+    // rule to each interval
     //
     const size_type N = N1 + (J - 1) * N2;
     gauss_jacobi_rule<T> gaujac(N1, T(), beta__ - 1);
@@ -196,6 +190,42 @@ void pow_kernel<T>::compute(real_type beta__, real_type delta__,
     std::swap(exponent_, a);
     std::swap(weight_, w);
     return;
+}
+
+//------------------------------------------------------------------------------
+// Private member functions
+//------------------------------------------------------------------------------
+template <typename T>
+void pow_kernel<T>::check_params(real_type beta__, real_type delta__,
+                                 real_type eps__)
+{
+    if (!(beta__ > real_type()))
+    {
+        std::ostringstream msg;
+        msg << "Invalid value for the argument `beta': "
+               "beta > 0 expected, but beta = "
+            << beta__ << " is given";
+        throw std::invalid_argument(msg.str());
+    }
+
+    if (!(real_type() < delta__ && delta__ < real_type(1)))
+    {
+        std::ostringstream msg;
+        msg << "Invalid value for the argument `delta': "
+               "0 < delta < 1 expected, but delta = "
+            << delta__ << " is given";
+        throw std::invalid_argument(msg.str());
+    }
+
+    if (!(real_type() < eps__ &&
+          eps__ < real_type(1) / arma::Datum<real_type>::e))
+    {
+        std::ostringstream msg;
+        msg << "Invalid value for the argument `eps': "
+               "0 < eps < 1/e expected, but "
+            << eps__ << " is given";
+        throw std::invalid_argument(msg.str());
+    }
 }
 
 template <typename T>
