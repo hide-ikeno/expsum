@@ -6,7 +6,6 @@
 #include <armadillo>
 
 #include "arma/lapack_extra.hpp"
-#include "expsum/numeric.hpp"
 
 namespace expsum
 {
@@ -309,7 +308,7 @@ coneig_sym_rrd<T>::run(matrix_type& X, real_vector_type& d, real_type threshold,
             auto xj          = X.col(j);
             const auto t     = arma::dot(xj, xj);
             const auto phase = t / std::abs(t);
-            const auto scale = std::sqrt(numeric::conj(phase));
+            const auto scale = std::sqrt(arma::access::alt_conj(phase));
             xj *= scale;
         }
     }
