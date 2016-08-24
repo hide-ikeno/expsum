@@ -2,8 +2,8 @@
 #include <iomanip>
 #include <iostream>
 
-#include "expsum/balanced_truncation.hpp"
 #include "expsum/exponential_sum.hpp"
+#include "expsum/reduction/balanced_truncation.hpp"
 
 using size_type = arma::uword;
 
@@ -57,6 +57,7 @@ void test_balanced_truncation(size_type n)
 
     vector_type a(n, arma::fill::randu);
     vector_type w(n, arma::fill::randu);
+    w *= T(10);
 
     result_type orig(a, w);
 
@@ -75,7 +76,7 @@ int main()
 
     arma::arma_rng::set_seed_random();
 
-    const size_type n       = 200;
+    const size_type n       = 500;
     const size_type n_trial = 5;
 
     std::cout << "# real quasi-cauchy matrix of dimension " << n << '\n';
