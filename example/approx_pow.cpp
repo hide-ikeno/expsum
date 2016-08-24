@@ -37,20 +37,18 @@ void run_approx_pow(real_type beta, real_type delta, real_type eps,
     pow_kern.compute(beta, delta, eps);
 
     function_type ret(pow_kern.exponents(), pow_kern.weights());
-    std::cout << "# Approximation of r^(" << beta << ") by exponential sum\n"
-              << "# no. of terms and (exponents, weights)\n"
-              << ret << '\n';
+    std::cout << "# no. of terms and (exponents, weights)\n" << ret << '\n';
     const auto grid = arma::logspace<real_vector>(std::log10(delta) - 1,
                                                   real_type(1), n_samples);
 
     print_result(beta, grid, ret);
 
-    // std::cout << "\n\n# After reduction\n" << ret << '\n';
-    // expsum::balanced_truncation<real_type> truncation;
-    // truncation.run(ret.exponent(), ret.weight(), eps);
+    expsum::balanced_truncation<real_type> truncation;
+    truncation.run(ret.exponent(), ret.weight(), eps);
 
-    // function_type ret_trunc(truncation.exponents(), truncation.weights());
-    // print_result(beta, grid, ret_trunc);
+    function_type ret_trunc(truncation.exponents(), truncation.weights());
+    std::cout << "\n\n# After reduction\n" << ret_trunc << '\n';
+    print_result(beta, grid, ret_trunc);
 }
 
 int main()
@@ -61,8 +59,20 @@ int main()
     const auto delta = 1.0e-8;
     const auto eps   = 1.0e-10;
 
+    std::cout << "#\n"
+                 "# Approximation of r^(-1) by exponential sum\n"
+                 "#\n"
+              << std::endl;
     run_approx_pow(1.0, delta, eps);
+    std::cout << "\n\n#\n"
+                 "# Approximation of r^(-1/2) by exponential sum\n"
+                 "#\n"
+              << std::endl;
     run_approx_pow(0.5, delta, eps);
+    std::cout << "\n\n#\n"
+                 "# Approximation of r^(-2) by exponential sum\n"
+                 "#\n"
+              << std::endl;
     run_approx_pow(2.0, delta, eps);
 
     return 0;

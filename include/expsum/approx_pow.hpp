@@ -179,8 +179,8 @@ void pow_kernel<T>::compute(real_type beta__, real_type delta__,
     std::tie(N1, b1) = get_num_gauss_jacobi(beta__, eps__ / (J + 1));
     std::tie(N2, b2) = get_num_gauss_legendre(beta__, eps__ / (J + 1));
 
-    std::cout << "J = " << J << ", N1 = " << N1 << " (b1 = " << b1 << ")"
-              << ", N2 = " << N2 << " (b2 =" << b2 << ")" << std::endl;
+    // std::cout << "J = " << J << ", N1 = " << N1 << " (b1 = " << b1 << ")"
+    //           << ", N2 = " << N2 << " (b2 =" << b2 << ")" << std::endl;
 
     //
     // Discritization of the integral representation of power function
