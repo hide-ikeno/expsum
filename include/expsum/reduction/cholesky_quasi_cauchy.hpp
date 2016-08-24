@@ -4,8 +4,6 @@
 #include <armadillo>
 #include <cassert>
 
-#include "expsum/numeric.hpp"
-
 namespace expsum
 {
 //
