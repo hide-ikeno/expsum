@@ -8,4 +8,5 @@ add_expsum_example(approx_pow)
 #add_expsum_example(complex_fit)
 add_expsum_example(esprit)
 add_expsum_example(fast_esprit)
+add_expsum_example(sph_bessel_kernel)
 

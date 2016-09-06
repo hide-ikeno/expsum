@@ -8,12 +8,10 @@
 
 #include <armadillo>
 
-#include "expsum/balanced_truncation.hpp"
 #include "expsum/constants.hpp"
 #include "expsum/exponential_sum.hpp"
-#include "expsum/gamma.hpp"
-#include "expsum/gauss_quadrature.hpp"
-#include "expsum/modified_prony_truncation.hpp"
+#include "expsum/kernel_functions/gamma.hpp"
+#include "expsum/kernel_functions/gauss_quadrature.hpp"
 
 namespace expsum
 {
@@ -281,7 +279,7 @@ pow_kernel<T>::get_num_gauss_jacobi(real_type beta__, real_type eps__)
     // Logarithm of pre-factor of R(N, x),
     const auto ln_pre = (beta__ + 2) * std::log(T(2)) - std::lgamma(beta__ + 1);
 
-    const size_type max_iter = 20;
+    const size_type max_iter = 100;
     const auto ln_eps        = std::log(eps__);
 
     // Initial guesses of parameters
@@ -360,7 +358,7 @@ pow_kernel<T>::get_num_gauss_legendre(real_type beta__, real_type eps__)
     const auto ln_pre = std::log(T(8)) - std::lgamma(beta__) +
                         beta__ * std::log(beta__ / constant<T>::e);
 
-    const size_type max_iter = 20;
+    const size_type max_iter = 100;
     const auto ln_eps        = std::log(eps__);
 
     // Initial guesses of parameters
