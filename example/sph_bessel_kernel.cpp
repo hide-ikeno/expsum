@@ -46,13 +46,15 @@ void make_sample(F f, double xmin, double xmax, Vec& result)
 //     return ret;
 // }
 
-void sph_bessel_kernel(int l, double xmax, double eps)
+expsum_type sph_bessel_kernel(int l, double xmax, double eps)
 {
-    using vector_type = arma::Col<double>;
+    // using vector_type = arma::Col<double>;
     expsum::sph_bessel_kernel<double> body;
     body.compute(l, xmax, eps);
 
-    return;
+    expsum_type ret(body.exponents(), body.weights());
+
+    return ret;
 }
 
 void sph_bessel_kernel_error(int l, double xmax, size_type n_samples,
@@ -65,8 +67,12 @@ void sph_bessel_kernel_error(int l, double xmax, size_type n_samples,
 
     for (size_type i = 0; i < n_samples; ++i)
     {
-        exact(i)  = boost::math::sph_bessel(l, x(i));
-        approx(i) = ret(x(i));
+        exact(i)    = boost::math::sph_bessel(l, x(i));
+        approx(i)   = ret(x(i));
+        auto abserr = std::abs(exact(i) - approx(i));
+        std::cout << std::setw(24) << x(i) << std::setw(24) << exact(i)
+                  << std::setw(24) << approx(i) << std::setw(24) << abserr
+                  << '\n';
     }
 
     vector_type abserr(arma::abs(exact - approx));
@@ -83,12 +89,12 @@ int main()
     std::cout.precision(15);
     std::cout.setf(std::ios::scientific);
 
-    const int lmax = 5;
+    const int lmax = 2;
 
-    // size_type N = 1024 * 1024; // # of sampling points
+    size_type N = 100001; // # of sampling points
     // size_type L = N / 2;       // window length
     // size_type M = 1000;        // max # of terms
-    double xmax = 1.0e5;
+    double xmax = 1.0e12;
     double eps  = 1.0e-12;
 
     expsum_type ret;
@@ -99,18 +105,25 @@ int main()
     // for (int l = 0; l <= lmax; ++l)
     // {
     //     std::cout << "\n# --- order " << l << '\n';
-    //     ret = sph_bessel_kernel(l, xmax, N, L, M, eps);
+    //     ret = sph_bessel_kernel(l, xmax, eps);
     //     ret.print(std::cout);
 
-    //     sph_bessel_kernel_error(l, 10.0, 10001, ret);
-    //     sph_bessel_kernel_error(l, 1.0e8, 1000001, ret);
+    //     sph_bessel_kernel_error(l, 10.0, N, ret);
+    //     sph_bessel_kernel_error(l, 1.0e8, N, ret);
     // }
 
-    for (int l = 0; l <= lmax; ++l)
-    {
-        std::cout << "\n# --- order " << l << '\n';
-        sph_bessel_kernel(l, xmax, eps);
-    }
+    // for (int l = 0; l <= lmax; ++l)
+    // {
+    //     std::cout << "\n# --- order " << l << '\n';
+    //     sph_bessel_kernel(l, xmax, eps);
+    // }
+
+    std::cout << "\n# --- order " << lmax << '\n';
+    ret = sph_bessel_kernel(1, xmax, eps);
+    ret.print(std::cout);
+    std::cout << "sum weights: " << arma::sum(ret.weight()) << std::endl;
+    sph_bessel_kernel_error(1, 1.0, 100001, ret);
+    // sph_bessel_kernel_error(1, xmax, N, ret);
 
     return 0;
 }
